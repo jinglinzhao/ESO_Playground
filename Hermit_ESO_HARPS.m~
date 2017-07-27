@@ -38,7 +38,7 @@ RV_gauss        = zeros(N_FILE,1);
 
 grid_size       = 0.1;
 v               = (-20 : grid_size : -2)';                                  % km/s
-cd ../../code
+cd ../HD224817../code
 
 %%%%%%%%%%%%%%%%%%%%%%%%%
 % Calculate Coefficient %
