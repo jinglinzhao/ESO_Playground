@@ -67,12 +67,12 @@ cd ..
 
 for order = 0:ORDER
     
-    [pxx,f] = plomb(coeff(order+1, :), MJD - min(MJD), 0.1, 100, 'normalized');
+    [pxx,f] = plomb(coeff(order+1, :), MJD - min(MJD), 1, 100, 'normalized');
     [pmax,lmax] = max(pxx);
     f0 = f(lmax);
     disp(['T_planet: ', num2str(1/f0)]);
 
-    [pxx_rvc,f_rvc] = plomb(coeff_rvc(order+1, :), MJD - min(MJD), 0.1, 100, 'normalized');
+    [pxx_rvc,f_rvc] = plomb(coeff_rvc(order+1, :), MJD - min(MJD), 1, 100, 'normalized');
     [pmax_rvc,lmax_rvc] = max(pxx_rvc);
     f0_rvc = f_rvc(lmax_rvc);
     disp(['T_activity: ', num2str(1/f0_rvc)]);
@@ -82,9 +82,9 @@ for order = 0:ORDER
     [pks_rvc,locs_rvc] = findpeaks(pxx_rvc, f_rvc);            
     [pks_maxs_rvc, idx_maxs_rvc] = sort(pks_rvc, 'descend'); 
 
-    [pxx_v,f_v] = plomb(VEL(:,2), MJD - min(MJD), 0.1, 100, 'normalized');
-    [pmax_v,lmax_v] = max(pxx_v);
-    f0_v = f(lmax_v);
+%     [pxx_v,f_v] = plomb(VEL(:,2), MJD - min(MJD), 0.1, 100, 'normalized');
+%     [pmax_v,lmax_v] = max(pxx_v);
+%     f0_v = f(lmax_v);
     
     h = figure;
         hold on
@@ -93,10 +93,10 @@ for order = 0:ORDER
 %         else
 %             ylim([-14 22])
 %         end
-        plot(f_v, pxx_v, 'k--')
+%         plot(f_v, pxx_v, 'k--')
         plot(f, pxx, 'r')
         plot(f_rvc, -pxx_rvc, 'b')
-        legend('RV', 'Rest frame', 'Observed frame', 'Location', 'Best')
+        legend('Rest frame', 'Observed frame', 'Location', 'Best')
         
         for i = 1:5
             x = locs(idx_maxs(i));  % locations of the largest peaks -> harmonics
