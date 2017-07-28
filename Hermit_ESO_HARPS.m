@@ -16,15 +16,12 @@ file_name   = {file_list.name};
 N_FILE      = size(file_name, 2);
 MJD         = zeros(N_FILE, 1);
 
-file_abandon = [4,5,6,68,111]+1;
 for n = 1:N_FILE
-    if ~sum(n == file_abandon)
-        FILE    = file_name{n};
-        spec    = fitsread(char(FILE));                                         % spectra of all orders
-        H       = fitsinfo(char(FILE));                                         % fits information including header
-        header  = H.PrimaryData.Keywords;                                       % get header only
-        MJD(n)  = header{30, 2};
-    end
+    FILE    = file_name{n};
+    spec    = fitsread(char(FILE));                                         % spectra of all orders
+    H       = fitsinfo(char(FILE));                                         % fits information including header
+    header  = H.PrimaryData.Keywords;                                       % get header only
+    MJD(n)  = header{30, 2};
 end
 
 ORDER           = 5;                                                        % Highest Hermite order 
@@ -44,23 +41,23 @@ cd ../../code
 % Calculate Coefficient %
 %%%%%%%%%%%%%%%%%%%%%%%%%
 h = waitbar(0,'Calculating Gauss-Hermite coefficients for all observations...');
+dat_list    = dir('../HD224817/4-ccf_dat/*.dat');
+dat_name   = {dat_list.name};
 
 for n = 1:N_FILE
-    if ~sum(n == file_abandon)
-        i           = n - 1;
-        filename    = ['../HD224817/4-ccf_dat/ccf', num2str(i), '.dat'];
-        A           = importdata(filename);
-        f           = fit( v, A, 'a*exp(-((x-b)/c)^2)+d', 'StartPoint', [0.15, -11.28, 2.5, 0] );
-        b           = f.b;  % shift
-        % plot(v,A, v,f(v)) % test %
-        RV_gauss(n) = b;    
+    i           = n - 1;
+    filename    = ['../HD224817/4-ccf_dat/', char(dat_name(n))];
+    A           = importdata(filename);
+    f           = fit( v, A, 'a*exp(-((x-b)/c)^2)+d', 'StartPoint', [0.15, -11.28, 2.5, 0] );
+    b           = f.b;  % shift
+    % plot(v,A, v,f(v)) % test %
+    RV_gauss(n) = b;    
 
-        for order = 0:ORDER
-            temp                    = hermite_nor(order, v + 11.28) * grid_size;
-            temp_rvc                = hermite_nor(order, v - b) * grid_size;
-            coeff(order+1, n)       = sum(A .* temp);  
-            coeff_rvc(order+1, n)   = sum(A .* temp_rvc); 
-        end
+    for order = 0:ORDER
+        temp                    = hermite_nor(order, v + 11.28) * grid_size;
+        temp_rvc                = hermite_nor(order, v - b) * grid_size;
+        coeff(order+1, n)       = sum(A .* temp);  
+        coeff_rvc(order+1, n)   = sum(A .* temp_rvc); 
     end
     waitbar( n / N_FILE )
 end

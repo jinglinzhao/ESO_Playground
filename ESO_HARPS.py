@@ -15,7 +15,9 @@ Created on Thu Jul 27 16:43:04 2017
 ###########
 # Remove hdulist[0].header['HIERARCH ESO DRS BERV']. 
 
+import os
 import sys
+import shutil
 from astropy.io import fits
 import glob
 import matplotlib.pyplot as plt
@@ -44,7 +46,7 @@ MJD         = np.zeros(n_file)
 RV_g        = np.zeros(n_file)
 RV_HARPS    = np.zeros(n_file)
 
-x           = np.arange(-20, -2+0.1, 0.1)                                # over sampling to 0.1 km/s [-10.2, -0.8]
+x           = np.arange(-20, -2+0.1, 0.1)                                       # over sampling to 0.1 km/s [-10.2, -0.8]
 y           = np.zeros(len(x))
 
 plt.figure()
@@ -55,12 +57,12 @@ for n in range(N_start, N_end):
     sys.stdout.write('\r')
     sys.stdout.write("[%-50s] %d%%" % ('='*int((n+1-N_start)*50./(N_end-N_start)), int((n+1-N_start)*100./(N_end-N_start))))
     sys.stdout.flush()    
-
     
     hdulist     = fits.open(FILE[n])
     v0          = hdulist[0].header['CRVAL1']                                   # velocity on the left (N_starting point)
     RV_HARPS[n] = hdulist[0].header['HIERARCH ESO DRS CCF RVC']                 # Baryc RV (drift corrected) (km/s)
     if RV_HARPS[n] > -10:
+        shutil.move(FILE[n], '../HD224817/3-ccf_fits/abandoned/')
         continue
     MJD[n]      = hdulist[0].header['MJD-OBS']
     
@@ -78,7 +80,9 @@ for n in range(N_start, N_end):
     y_new       = (y - popt[3]) / popt[0]
     # plt.plot(x_new, y_new, '-')
     
-    writefile   = '../HD224817/4-ccf_dat/ccf' + str(n) + '.dat'
+    output_name = FILE[n]
+    output_name = output_name.replace('3-ccf_fits', '4-ccf_dat')
+    writefile   = output_name.replace('.fits', '.dat')
     np.savetxt(writefile, y_new)
 
 # Verification # 
