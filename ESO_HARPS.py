@@ -24,20 +24,18 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.optimize import curve_fit
 from scipy.interpolate import CubicSpline
-from math import sqrt
 import math
 
-############# DEFINE FUNCTIONS ##############
 def gaussian(x, a, mu, sigma, C):
-    val = a / ( sqrt(2*math.pi) * sigma ) * np.exp(-(x - mu)**2 / sigma**2) + C
-    return val    
+    val = a / ( (2*math.pi)**0.5 * sigma ) * np.exp(-(x - mu)**2 / sigma**2) + C
+    return val
 
 # Root mean square
-def rms(num):
-    return sqrt(sum(n*n for n in num)/len(num))
+#def rms(num):
+#    return sqrt(sum(n*n for n in num)/len(num))
 #############################################
 
-star        = 'HD96700'
+star        = 'HD142'
 FILE        = glob.glob('../' + star + '/3-ccf_fits/*fits')
 N           = len(FILE)
 N_start     = 0
@@ -47,7 +45,8 @@ MJD         = np.zeros(n_file)
 RV_g        = np.zeros(n_file)
 RV_HARPS    = np.zeros(n_file)
 
-x           = np.arange(12.5-10, 12.5+10+0.1, 0.1)                                       # over sampling to 0.1 km/s [-10.2, -0.8]
+# x           = np.arange(12.5-10, 12.5+10+0.1, 0.1)                                # HD96700       # over sampling to 0.1 km/s [-10.2, -0.8]
+x           = np.arange(5.5-18, 5.5+18+0.1, 0.1) 
 y           = np.zeros(len(x))
 
 plt.figure()
@@ -63,13 +62,24 @@ for n in range(N_start, N_end):
     v0          = hdulist[0].header['CRVAL1']                                   # velocity on the left (N_starting point)
     RV_HARPS[n] = hdulist[0].header['HIERARCH ESO DRS CCF RVC']                 # Baryc RV (drift corrected) (km/s)
     v_noise     = hdulist[0].header['HIERARCH ESO DRS CCF NOISE'] * 1000        # RV_noise in m/s
-    if v_noise > 5:
+    star_read   = hdulist[0].header['OBJECT']
+    
+    # remove file if necessary
+    if star_read != star:
+        print (' Achtung! ' + star_read + ' instead of '+ star)
         shutil.move(FILE[n], '../' + star + '/3-ccf_fits/abandoned/')
         continue
     
-#    if RV_HARPS[n] > -10:
-#        shutil.move(FILE[n], '../' + star + '/3-ccf_fits/abandoned/')
-#        continue
+    if v_noise > 5:
+        print(' Achtung! ' + star_read + 'too noisy')
+        shutil.move(FILE[n], '../' + star + '/3-ccf_fits/abandoned/')
+        continue
+    
+    if (RV_HARPS[n] > 5.5+10) or (RV_HARPS[n] < 5.5-10):
+        print(' Achtung! ' +  star_read + ' largely offset')
+        shutil.move(FILE[n], '../' + star + '/3-ccf_fits/abandoned/')
+        continue
+
     MJD[n]      = hdulist[0].header['MJD-OBS']
     
     CCF         = hdulist[0].data                                               # ccf 2-d array
@@ -80,7 +90,8 @@ for n in range(N_start, N_end):
 
     f           = CubicSpline(v, ccf / ccf.max())
     y           = f(x)
-    popt, pcov  = curve_fit( gaussian, x, y, [-1.76, RV_HARPS[n], 2.5, 1])
+    # popt, pcov  = curve_fit( gaussian, x, y, [-1.76, RV_HARPS[n], 2.5, 1])
+    popt, pcov  = curve_fit( gaussian.gaussian, x, y, [-5, RV_HARPS[n], 9, 1])
     # plt.plot(x, y, x, gaussian(x, *popt))
     RV_g[n]     = popt[1]
     x_new       = x
