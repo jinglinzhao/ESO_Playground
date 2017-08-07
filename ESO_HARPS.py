@@ -35,7 +35,7 @@ def gaussian(x, a, mu, sigma, C):
 #    return sqrt(sum(n*n for n in num)/len(num))
 #############################################
 
-star        = 'HD142'
+star        = 'Gl581'
 FILE        = glob.glob('../' + star + '/3-ccf_fits/*fits')
 N           = len(FILE)
 N_start     = 0
@@ -45,8 +45,10 @@ MJD         = np.zeros(n_file)
 RV_g        = np.zeros(n_file)
 RV_HARPS    = np.zeros(n_file)
 
-# x           = np.arange(12.5-10, 12.5+10+0.1, 0.1)                                # HD96700       # over sampling to 0.1 km/s [-10.2, -0.8]
-x           = np.arange(5.5-18, 5.5+18+0.1, 0.1) 
+# x           = np.arange(12.5-10, 12.5+10+0.1, 0.1)                            # HD96700 FWHM = 6.9      # over sampling to 0.1 km/s [-10.2, -0.8]
+# x           = np.arange(5.5-18, 5.5+18+0.1, 0.1)                                # HD142 FWHM = 15
+# x           = np.arange(31-10, 31+10+0.1, 0.1)                                  # CoRot-7
+x           = np.arange(-9.2-4.5, -9.2+4.5+0.1, 0.1) 
 y           = np.zeros(len(x))
 
 plt.figure()
@@ -71,11 +73,11 @@ for n in range(N_start, N_end):
         continue
     
     if v_noise > 5:
-        print(' Achtung! ' + star_read + 'too noisy')
+        print(' Achtung! ' + star_read + ' too noisy')
         shutil.move(FILE[n], '../' + star + '/3-ccf_fits/abandoned/')
         continue
     
-    if (RV_HARPS[n] > 5.5+10) or (RV_HARPS[n] < 5.5-10):
+    if (RV_HARPS[n] > -9.2+10) or (RV_HARPS[n] < -9.2-10):
         print(' Achtung! ' +  star_read + ' largely offset')
         shutil.move(FILE[n], '../' + star + '/3-ccf_fits/abandoned/')
         continue
@@ -91,9 +93,15 @@ for n in range(N_start, N_end):
     f           = CubicSpline(v, ccf / ccf.max())
     y           = f(x)
     # popt, pcov  = curve_fit( gaussian, x, y, [-1.76, RV_HARPS[n], 2.5, 1])
-    popt, pcov  = curve_fit( gaussian.gaussian, x, y, [-5, RV_HARPS[n], 9, 1])
+    popt, pcov  = curve_fit( gaussian, x, y, [-5, RV_HARPS[n], 4, 1])
     # plt.plot(x, y, x, gaussian(x, *popt))
     RV_g[n]     = popt[1]
+    
+    if abs(RV_HARPS[n] - RV_g[n])*1000 > 5:
+        print(' Achtung! ' +  star_read + ' RV fitting issue')
+        shutil.move(FILE[n], '../' + star + '/3-ccf_fits/abandoned/')    
+        continue
+        
     x_new       = x
     y_new       = (y - popt[3]) / popt[0]
     plt.plot(x_new, y_new, '-')
@@ -105,7 +113,7 @@ for n in range(N_start, N_end):
 
 # Verification # 
 if 0:
-    idx = (RV_g == 0);
+    idx = (RV_g == 0)
     plt.plot( RV_g[~idx] *1000, RV_HARPS[~idx] * 1000, '+')
     plt.plot(MJD[~idx], RV_g[~idx] *1000, '.', MJD[~idx], RV_HARPS[~idx] * 1000, '+')
     plt.plot(MJD, (RV_g - np.mean(RV_g))*1000, '.', MJD, (RV_HARPS - np.mean(RV_HARPS)) * 1000, '+')
