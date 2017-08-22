@@ -120,10 +120,7 @@ popt, pcov  = curve_fit( gaussian, x_tmp, Y_tmp2)
 writefile = ('../' + star + '/template2.dat')
 np.savetxt(writefile, Y_tmp2)
 
-#    output_name = FILE[n]
-#    output_name = output_name.replace('3-ccf_fits', '4-ccf_dat')
-#    writefile   = output_name.replace('.fits', '.dat')
-#    np.savetxt(writefile, y_new)
+
 
 # Verification # 
 if 0:

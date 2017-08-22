@@ -5,7 +5,7 @@ Created on Fri Aug  4 10:46:40 2017
 
 @author: jzhao
 """
-
+# Update [-RVW/2, RV_HARPS[n], RVW/2, 1] 22/08/17
 
 
 import sys
@@ -51,7 +51,7 @@ for n in range(n_file):
 print('\n')  
 
 RVC     = median(RV_HARPS)
-RVW     = median(FWHM_HARPS) * 1.5
+RVW     = median(FWHM_HARPS) * 1.4
 x       = np.arange(RVC-RVW, RVC+RVW+0.1, 0.1)
 y       = np.zeros(len(x))
 x_tmp   = np.arange(RVC-RVW, RVC+RVW+0.1, 0.1)
@@ -83,7 +83,7 @@ for n in range(n_file):
         shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')
         continue
     
-    if (RV_HARPS[n] > -9.2+10) or (RV_HARPS[n] < -9.2-10):
+    if (RV_HARPS[n] > RVC+10) or (RV_HARPS[n] < RVC-10):
         print(' Achtung! ' +  STAR_read + ' largely offset')
         shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')
         continue
@@ -94,40 +94,38 @@ for n in range(n_file):
     ccf         = CCF[- 1, :]                                                   # ccf 1-d array (whole range)
     delta_v     = hdulist[0].header['CDELT1']                                   # velocity grid size 
     v           = v0 + np.arange(CCF.shape[1]) * delta_v                        # velocity array (whole range)
-    # plt.plot(v,ccf)
-
     f           = CubicSpline(v, ccf / ccf.max())
     y           = f(x)
-    popt, pcov  = curve_fit( gaussian, x, y, [-1.8, RV_HARPS[n], 2.5, 1])
-    # plt.plot(x, y, x, gaussian(x, *popt))
+    popt, pcov  = curve_fit( gaussian, x, y, [-RVW/2, RV_HARPS[n], RVW/2, 1])
     RV_g[n]     = popt[1]
     
     if abs(RV_HARPS[n] - RV_g[n])*1000 > 5:
         print(' Achtung! ' +  STAR_read + ' RV fitting issue')
         shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')    
         continue
+
+
+#    def obj(mu):
+#        return np.std(y[xidx] * mu - ccf_base[xidx])
+#    
+#    res = minimize(obj, 1)
         
-    x_new       = x - popt[1]
+    x_new       = x - (popt[1] - RVC)
     y_new       = (y - popt[3]) / popt[0]
-    plt.plot(x_new, y_new, '-')
+#    plt.plot(x_new, y_new, '-')
     ccf_max[n]  = ccf.max()
     
     f           = CubicSpline(x_new, y_new)
     y_tmp       = f(x_tmp) *  ccf.max()
     Y_tmp       = Y_tmp + y_tmp
-#    plt.plot(x_tmp, f(x_tmp) - Y_tmp)
+#    plt.figure()
+    plt.plot(x_tmp - RVC, f(x_tmp) - Y_tmp)
     
 Y_tmp = Y_tmp / sum(ccf_max)
-
-popt, pcov  = curve_fit( gaussian, x_tmp, Y_tmp)
 
 writefile = ('../' + STAR + '/template1.dat')
 np.savetxt(writefile, Y_tmp)
 
-#    output_name = FILE[n]
-#    output_name = output_name.replace('3-ccf_fits', '4-ccf_dat')
-#    writefile   = output_name.replace('.fits', '.dat')
-#    np.savetxt(writefile, y_new)
 
 # Verification # 
 if 0:
