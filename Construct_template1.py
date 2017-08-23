@@ -104,12 +104,6 @@ for n in range(n_file):
         shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')    
         continue
 
-
-#    def obj(mu):
-#        return np.std(y[xidx] * mu - ccf_base[xidx])
-#    
-#    res = minimize(obj, 1)
-        
     x_new       = x - (popt[1] - RVC)
     y_new       = (y - popt[3]) / popt[0]
 #    plt.plot(x_new, y_new, '-')
