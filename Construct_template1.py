@@ -19,15 +19,11 @@ from scipy.interpolate import CubicSpline
 import math
 from statistics import median
 
+#############################################
 def gaussian(x, a, mu, sigma, C):
     val = a / ( (2*math.pi)**0.5 * sigma ) * np.exp(-(x - mu)**2 / sigma**2) + C
     return val
-
-# Root mean square
-#def rms(num):
-#    return sqrt(sum(n*n for n in num)/len(num))
 #############################################
-
 
 STAR        = 'HD189733'
 FILE        = glob.glob('../' + STAR + '/3-ccf_fits/*fits')
@@ -36,7 +32,7 @@ MJD         = np.zeros(n_file)
 RV_g        = np.zeros(n_file)
 RV_HARPS    = np.zeros(n_file)
 FWHM_HARPS  = np.zeros(n_file)
-ccf_max     = np.zeros(n_file)
+y_max       = np.zeros(n_file)
 
 for n in range(n_file):
     # progress bar #
@@ -51,11 +47,11 @@ for n in range(n_file):
 print('\n')  
 
 RVC     = median(RV_HARPS)
-RVW     = median(FWHM_HARPS) * 1.4
-x       = np.arange(RVC-RVW, RVC+RVW+0.1, 0.1)
+RVW     = median(FWHM_HARPS) * 1.5
+x       = np.arange(RVC-RVW, RVC+RVW, 0.1)
 y       = np.zeros(len(x))
-x_tmp   = np.arange(RVC-RVW, RVC+RVW+0.1, 0.1)
-Y_tmp   = np.arange(RVC-RVW, RVC+RVW+0.1, 0.1)
+x_tmp   = np.arange(RVC-RVW, RVC+RVW, 0.1)
+Y_tmp   = np.zeros(len(x_tmp))
 
 plt.figure()
 
@@ -68,9 +64,9 @@ for n in range(n_file):
     
     hdulist     = fits.open(FILE[n])
     v0          = hdulist[0].header['CRVAL1']                                   # velocity on the left (N_STARting point)
-    RV_HARPS[n] = hdulist[0].header['HIERARCH ESO DRS CCF RVC']                 # Baryc RV (drift corrected) (km/s)
     v_noise     = hdulist[0].header['HIERARCH ESO DRS CCF NOISE'] * 1000        # RV_noise in m/s
     STAR_read   = hdulist[0].header['OBJECT']
+    MJD[n]      = hdulist[0].header['MJD-OBS']
     
     # remove file if necessary
     if STAR_read != STAR:
@@ -88,15 +84,17 @@ for n in range(n_file):
         shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')
         continue
 
-    MJD[n]      = hdulist[0].header['MJD-OBS']
-    
     CCF         = hdulist[0].data                                               # ccf 2-d array
     ccf         = CCF[- 1, :]                                                   # ccf 1-d array (whole range)
     delta_v     = hdulist[0].header['CDELT1']                                   # velocity grid size 
+    
     v           = v0 + np.arange(CCF.shape[1]) * delta_v                        # velocity array (whole range)
-    f           = CubicSpline(v, ccf / ccf.max())
-    y           = f(x)
-    popt, pcov  = curve_fit( gaussian, x, y, [-RVW/2, RV_HARPS[n], RVW/2, 1])
+    idx_v       = (v > RVC-RVW-0.1) & (v < RVC+RVW+0.1)
+    x           = v[idx_v]
+    y           = ccf[idx_v]
+    y_max[n]    = y.max()
+    
+    popt, pcov  = curve_fit( gaussian, x, y/max(y), [-RVW/2, RV_HARPS[n], RVW/2, 1])
     RV_g[n]     = popt[1]
     
     if abs(RV_HARPS[n] - RV_g[n])*1000 > 5:
@@ -104,18 +102,14 @@ for n in range(n_file):
         shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')    
         continue
 
-    x_new       = x - (popt[1] - RVC)
-    y_new       = (y - popt[3]) / popt[0]
-#    plt.plot(x_new, y_new, '-')
-    ccf_max[n]  = ccf.max()
-    
-    f           = CubicSpline(x_new, y_new)
-    y_tmp       = f(x_tmp) *  ccf.max()
+    f           = CubicSpline( x-(popt[1]-RVC), y )                             # shift the observed spectrum in order to co-add to a template
+    y_tmp       = f(x_tmp)
     Y_tmp       = Y_tmp + y_tmp
 #    plt.figure()
-    plt.plot(x_tmp - RVC, f(x_tmp) - Y_tmp)
+#    plt.plot(x_tmp - RVC, y_tmp / y.max() - Y_tmp)
+#    plt.plot(x_tmp - RVC, y_tmp)
     
-Y_tmp = Y_tmp / sum(ccf_max)
+Y_tmp = Y_tmp / sum(y_max)
 
 writefile = ('../' + STAR + '/template1.dat')
 np.savetxt(writefile, Y_tmp)
