@@ -5,6 +5,9 @@ Created on Tue Aug 22 15:01:51 2017
 
 @author: jzhao
 """
+# modify to find out the 1st order coefficient @25/08/17
+# further modify to find out the shift of the observation so that the 1st order coefficient  becomes 0 @30/08/17
+# introduce error propropagation and weights @30/08/17
 
 
 import sys
@@ -52,7 +55,6 @@ for n in range(n_file):
 print('\n')  
 
 
-
 RVC     = median(RV_HARPS)
 RVW     = median(FWHM_HARPS) * 1.5
 x       = np.arange(RVC-RVW, RVC+RVW, 0.1)
@@ -61,8 +63,10 @@ x_tmp   = np.arange(RVC-RVW, RVC+RVW, 0.1)
 Y_tmp1  = np.loadtxt('../' + STAR + '/template1.dat')
 Y_tmp2  = np.zeros(len(x_tmp))
 
-plt.figure()
+#plt.figure()
 
+popt, pcov  = curve_fit( gaussian, x_tmp, Y_tmp1, [-RVW/2, RVC, RVW/2, 1])
+Y_tmp1      = (Y_tmp1 - popt[3]) / popt[0]
 for n in range(n_file):
     
     # progress bar #
@@ -90,6 +94,7 @@ for n in range(n_file):
     f_test      = CubicSpline(v, ccf)
     y_test      = f_test(x_tmp)
     y_test      = y_test/max(y_test)
+    y_test      = (y_test - popt[3]) / popt[0]
 #    plt.figure(); plt.plot(x_tmp, y_test, x_tmp, Y_tmp1)
     array_hermite = hermfit(x_tmp - RVC, y_test / Y_tmp1, 5)
     array1[n]   = array_hermite[1]
