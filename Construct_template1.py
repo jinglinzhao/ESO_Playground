@@ -47,7 +47,7 @@ for n in range(n_file):
 print('\n')  
 
 RVC     = median(RV_HARPS)
-RVW     = median(FWHM_HARPS) * 1.5
+RVW     = median(FWHM_HARPS) * 1.4
 x       = np.arange(RVC-RVW, RVC+RVW, 0.1)
 y       = np.zeros(len(x))
 x_tmp   = np.arange(RVC-RVW, RVC+RVW, 0.1)
@@ -108,11 +108,13 @@ for n in range(n_file):
 #    plt.figure()
 #    plt.plot(x_tmp - RVC, y_tmp / y.max() - Y_tmp)
 #    plt.plot(x_tmp - RVC, y_tmp)
-    
-Y_tmp = Y_tmp / sum(y_max)
 
 writefile = ('../' + STAR + '/template1.dat')
 np.savetxt(writefile, Y_tmp)
+
+Y_tmp_err   = Y_tmp**0.5
+writefile = ('../' + STAR + '/template1_err.dat')
+np.savetxt(writefile, Y_tmp_err)
 
 
 # Verification # 

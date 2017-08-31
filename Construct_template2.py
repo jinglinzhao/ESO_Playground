@@ -42,6 +42,7 @@ MJD, RV_fit, RV_HARPS, FWHM_HARPS, y_max    = np.zeros((5, n_file))
 LPD, A, S, K                                = np.zeros((4, n_file))
 array1      = np.zeros(n_file)
 
+print('Reading data...')
 for n in range(n_file):
     # progress bar #
     sys.stdout.write('\r')
@@ -54,21 +55,25 @@ for n in range(n_file):
 
 print('\n')  
 
-
 RVC     = median(RV_HARPS)
-RVW     = median(FWHM_HARPS) * 1.5
+RVW     = median(FWHM_HARPS) * 1.4
 x       = np.arange(RVC-RVW, RVC+RVW, 0.1)
 y       = np.zeros(len(x))
 x_tmp   = np.arange(RVC-RVW, RVC+RVW, 0.1)
 Y_tmp1  = np.loadtxt('../' + STAR + '/template1.dat')
-Y_tmp2  = np.zeros(len(x_tmp))
+Y_tmp1_err = np.loadtxt('../' + STAR + '/template1_err.dat')
+Y_tmp1_nor = Y_tmp1 / max(Y_tmp1)
+Y_tmp1_err = Y_tmp1_err / max(Y_tmp1)
+#Y_tmp2  = np.zeros(len(x_tmp))
 
 #plt.figure()
+#Y_tmp1_err  = Y_tmp1**0.5
+popt, pcov  = curve_fit( gaussian, x_tmp, Y_tmp1_nor, [-RVW/2, RVC, RVW/2, 1])
+Y_tmp1_nor  = (Y_tmp1_nor - popt[3]) / popt[0]
+Y_tmp1_err  = Y_tmp1_err / abs(popt[0])
 
-popt, pcov  = curve_fit( gaussian, x_tmp, Y_tmp1, [-RVW/2, RVC, RVW/2, 1])
-Y_tmp1      = (Y_tmp1 - popt[3]) / popt[0]
+print('Calculating...')
 for n in range(n_file):
-    
     # progress bar #
     sys.stdout.write('\r')
     sys.stdout.write("[%-50s] %d%%" % ('='*int((n+1)*50./n_file), int((n+1)*100./n_file)))
@@ -88,18 +93,28 @@ for n in range(n_file):
     y           = ccf[idx_v] 
     y_max[n]    = y.max()
 
-
-
     # test begins
-    f_test      = CubicSpline(v, ccf)
-    y_test      = f_test(x_tmp)
-    y_test      = y_test/max(y_test)
-    y_test      = (y_test - popt[3]) / popt[0]
-#    plt.figure(); plt.plot(x_tmp, y_test, x_tmp, Y_tmp1)
-    array_hermite = hermfit(x_tmp - RVC, y_test / Y_tmp1, 5)
-    array1[n]   = array_hermite[1]
+    def obj(x_shift):
+        f_test      = CubicSpline(v + x_shift, ccf)
+        y_test      = f_test(x_tmp)
+        y_test_err  = y_test**0.5
+        y_test      = y_test / max(y_test)
+        y_test_err  = y_test_err / max(y_test)
+        y_test      = (y_test - popt[3]) / popt[0]
+        y_test_err  = y_test_err / abs(popt[0])
+    #    plt.figure(); plt.plot(x_tmp, y_test, x_tmp, Y_tmp1)
+        array_hermite = hermfit(x_tmp - popt[1], y_test / Y_tmp1_nor, 4, w = 1 / (y_test/Y_tmp1_nor * ((y_test/y_test_err)**2 + (Y_tmp1_err/Y_tmp1_nor)**2)**0.5)**2)
+        return abs(array_hermite[1])
+    res = minimize(obj, 0)
+    array1[n] = res.x[0]
     
-    
+plt.figure();
+plt.plot(MJD, array1, '.')
+plt.xlabel('MJD')
+plt.ylabel('x_shift4')
+
+
+
     
 #    y           = ccf[idx_v] / max(ccf[idx_v])
 #    popt, pcov  = curve_fit( gaussian, x, y, [-RVW/2, RV_HARPS[n], RVW/2, 1])
@@ -107,7 +122,7 @@ for n in range(n_file):
 
         
     # Now shift the template to match the observation
-    '''
+'''
     # Option 1: minimize rms
     def obj(x_shift):
         f           = CubicSpline(x_tmp + x_shift, Y_tmp1)                      # shift the template to the right (for x_shift > 0) to match the observation
@@ -130,7 +145,7 @@ for n in range(n_file):
     A[n]        = 1. / sigma_2**0.5 * sum(obs * x_new**1) / sum(obs)
     S[n]        = 1. / sigma_2**1.5 * sum(obs * x_new**3) / sum(obs)
     K[n]        = 1. / sigma_2**2.0 * sum(obs * x_new**4) / sum(obs)   
-    '''
+'''
     # Option 2: maximize exponential
 #    def obj(x_shift):
 #        f           = CubicSpline(x_tmp + x_shift, Y_tmp1)
@@ -141,7 +156,7 @@ for n in range(n_file):
 #    RV_fit[n] = res.x[0]
         
 #plt.plot(MJD, RV_fit, '.', MJD, RV_HARPS-RVC , '+')   
-Y_tmp2 = Y_tmp2 / sum(y_max)
+#Y_tmp2 = Y_tmp2 / sum(y_max)
     
 
 
