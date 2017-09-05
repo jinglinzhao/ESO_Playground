@@ -51,8 +51,8 @@ for n in range(n_file):
 print('\n')  
 
 RVC     = median(RV_HARPS)
-RVW     = median(FWHM_HARPS) * 1.5
-x_tmp   = np.arange(RVC-RVW, RVC+RVW+0.1, 0.1)
+RVW     = median(FWHM_HARPS) * 1.4
+x_tmp   = np.arange(RVW, RVW+0.1, 0.1)
 Y_tmp   = np.zeros(len(x_tmp))
 buffer  = max(RV_HARPS) - min(RV_HARPS)
 
@@ -92,7 +92,7 @@ for n in range(n_file):
     delta_v     = hdulist[0].header['CDELT1']                                   # velocity grid size 
     
     v           = v0 + np.arange(CCF.shape[1]) * delta_v                        # velocity array (whole range)
-    idx_v       = (v > RVC - RVW - 0.1 - buffer) & (v < RVC + RVW + 0.1 + buffer)
+    idx_v       = (v > RVC - RVW - buffer) & (v < RVC + RVW + 0.1 + buffer)
     x           = v[idx_v]
     y           = ccf[idx_v]
     
@@ -104,12 +104,13 @@ for n in range(n_file):
         shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')    
         continue
 
-    f           = CubicSpline( x - popt[1] + RVC, y )                           # shift the observed spectrum in order to co-add to a template
+    f           = CubicSpline( x - popt[1], y )                           # shift the observed spectrum in order to co-add to a template
     y_tmp       = f(x_tmp)
     Y_tmp       = Y_tmp + y_tmp
     
     if PLOT:
-        x_sample   = np.append(np.arange(RVC - 0.9*RVW, RVC - RVW, -0.1), np.arange(RVC + 0.9*RVW, RVC + RVW, 0.1))
+        
+        x_sample   = np.append(np.arange(-0.9*RVW, -RVW, -0.1), np.arange(0.9*RVW, RVW, 0.1))
         y_sample   = f(x_sample)
         ave_sample = np.mean(y_sample)
         plt.figure(); plt.plot(x_sample, y_sample, '.')
