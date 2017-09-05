@@ -5,7 +5,9 @@ Created on Fri Aug  4 10:46:40 2017
 
 @author: jzhao
 """
-# Update [-RVW/2, RV_HARPS[n], RVW/2, 1] 22/08/17
+# Update [-RVW/2, RV_HARPS[n], RVW/2, 1] @22/08/17
+# Flux varies by a factor of four even the exposure time remains the same for all observations - because the seeing changes @05/09/17
+# Introduce weights for fitting @05/09/17
 
 
 import sys
@@ -92,9 +94,9 @@ for n in range(n_file):
     idx_v       = (v > RVC-RVW-0.1) & (v < RVC+RVW+0.1)
     x           = v[idx_v]
     y           = ccf[idx_v]
-    y_max[n]    = y.max()
+    y_max[n]    = max(y)
     
-    popt, pcov  = curve_fit( gaussian, x, y/max(y), [-RVW/2, RV_HARPS[n], RVW/2, 1])
+    popt, pcov  = curve_fit( gaussian, x, y, [-RVW/2 * max(y), RV_HARPS[n], RVW/2, 1], sigma = y**0.5, absolute_sigma = True)
     RV_g[n]     = popt[1]
     
     if abs(RV_HARPS[n] - RV_g[n])*1000 > 5:
@@ -102,19 +104,18 @@ for n in range(n_file):
         shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')    
         continue
 
-    f           = CubicSpline( x-(popt[1]-RVC), y )                             # shift the observed spectrum in order to co-add to a template
+    f           = CubicSpline( x - popt[1] + RVC, y )                           # shift the observed spectrum in order to co-add to a template
     y_tmp       = f(x_tmp)
     Y_tmp       = Y_tmp + y_tmp
-#    plt.figure()
 #    plt.plot(x_tmp - RVC, y_tmp / y.max() - Y_tmp)
-#    plt.plot(x_tmp - RVC, y_tmp)
+#    plt.plot(x_tmp - RVC, y_tmp / max(y))
 
 writefile = ('../' + STAR + '/template1.dat')
 np.savetxt(writefile, Y_tmp)
 
-Y_tmp_err   = Y_tmp**0.5
-writefile = ('../' + STAR + '/template1_err.dat')
-np.savetxt(writefile, Y_tmp_err)
+#Y_tmp_err   = Y_tmp**0.5
+#writefile = ('../' + STAR + '/template1_err.dat')
+#np.savetxt(writefile, Y_tmp_err)
 
 
 # Verification # 
@@ -122,5 +123,4 @@ if 0:
     idx = (RV_g == 0)
     plt.plot( RV_g[~idx] *1000, RV_HARPS[~idx] * 1000, '+')
     plt.plot(MJD[~idx], RV_g[~idx] *1000, '.', MJD[~idx], RV_HARPS[~idx] * 1000, '+')
-    plt.plot(MJD, (RV_g - np.mean(RV_g))*1000, '.', MJD, (RV_HARPS - np.mean(RV_HARPS)) * 1000, '+')
     plt.show()
