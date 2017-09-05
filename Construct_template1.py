@@ -8,6 +8,8 @@ Created on Fri Aug  4 10:46:40 2017
 # Update [-RVW/2, RV_HARPS[n], RVW/2, 1] @22/08/17
 # Flux varies by a factor of four even the exposure time remains the same for all observations - because the seeing changes @05/09/17
 # Introduce weights for fitting @05/09/17
+# Introduce buffer: idx_v = (v > RVC-RVW-0.1-buffer) & (v < RVC+RVW+0.1+buffer), so that (x - popt[1] + RVC) is within x_tmp @05/09/17
+# Normalized by an average instead of max(y) @05/09/17
 
 
 import sys
@@ -34,7 +36,7 @@ MJD         = np.zeros(n_file)
 RV_g        = np.zeros(n_file)
 RV_HARPS    = np.zeros(n_file)
 FWHM_HARPS  = np.zeros(n_file)
-y_max       = np.zeros(n_file)
+PLOT        = True
 
 for n in range(n_file):
     # progress bar #
@@ -49,11 +51,10 @@ for n in range(n_file):
 print('\n')  
 
 RVC     = median(RV_HARPS)
-RVW     = median(FWHM_HARPS) * 1.4
-x       = np.arange(RVC-RVW, RVC+RVW, 0.1)
-y       = np.zeros(len(x))
-x_tmp   = np.arange(RVC-RVW, RVC+RVW, 0.1)
+RVW     = median(FWHM_HARPS) * 1.5
+x_tmp   = np.arange(RVC-RVW, RVC+RVW+0.1, 0.1)
 Y_tmp   = np.zeros(len(x_tmp))
+buffer  = max(RV_HARPS) - min(RV_HARPS)
 
 plt.figure()
 
@@ -91,10 +92,9 @@ for n in range(n_file):
     delta_v     = hdulist[0].header['CDELT1']                                   # velocity grid size 
     
     v           = v0 + np.arange(CCF.shape[1]) * delta_v                        # velocity array (whole range)
-    idx_v       = (v > RVC-RVW-0.1) & (v < RVC+RVW+0.1)
+    idx_v       = (v > RVC - RVW - 0.1 - buffer) & (v < RVC + RVW + 0.1 + buffer)
     x           = v[idx_v]
     y           = ccf[idx_v]
-    y_max[n]    = max(y)
     
     popt, pcov  = curve_fit( gaussian, x, y, [-RVW/2 * max(y), RV_HARPS[n], RVW/2, 1], sigma = y**0.5, absolute_sigma = True)
     RV_g[n]     = popt[1]
@@ -107,8 +107,16 @@ for n in range(n_file):
     f           = CubicSpline( x - popt[1] + RVC, y )                           # shift the observed spectrum in order to co-add to a template
     y_tmp       = f(x_tmp)
     Y_tmp       = Y_tmp + y_tmp
-#    plt.plot(x_tmp - RVC, y_tmp / y.max() - Y_tmp)
-#    plt.plot(x_tmp - RVC, y_tmp / max(y))
+    
+    if PLOT:
+        x_sample   = np.append(np.arange(RVC - 0.9*RVW, RVC - RVW, -0.1), np.arange(RVC + 0.9*RVW, RVC + RVW, 0.1))
+        y_sample   = f(x_sample)
+        ave_sample = np.mean(y_sample)
+        plt.figure(); plt.plot(x_sample, y_sample, '.')
+#        plt.plot(x_tmp - RVC, y_tmp / ave_sample)   
+ 
+#    plt.plot(x_tmp - RVC, y_tmp / ave_sample - Y_tmp)
+
 
 writefile = ('../' + STAR + '/template1.dat')
 np.savetxt(writefile, Y_tmp)
