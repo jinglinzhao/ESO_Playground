@@ -38,6 +38,7 @@ RV_HARPS    = np.zeros(n_file)
 FWHM_HARPS  = np.zeros(n_file)
 PLOT        = True
 
+print('Reading data...')
 for n in range(n_file):
     # progress bar #
     sys.stdout.write('\r')
@@ -45,19 +46,19 @@ for n in range(n_file):
     sys.stdout.flush()    
     
     hdulist     	= fits.open(FILE[n])
-    RV_HARPS[n] 	= hdulist[0].header['HIERARCH ESO DRS CCF RVC']                 # Baryc RV (drift corrected) (km/s)
+    RV_HARPS[n] 	= hdulist[0].header['HIERARCH ESO DRS CCF RVC']               # Baryc RV (drift corrected) (km/s)
     FWHM_HARPS[n] = hdulist[0].header['HIERARCH ESO DRS CCF FWHM']
 
 print('\n')  
 
 RVC     = median(RV_HARPS)
 RVW     = median(FWHM_HARPS) * 1.4
-x_tmp   = np.arange(RVW, RVW+0.1, 0.1)
+x_tmp   = np.arange(-RVW, RVW+0.1, 0.1)
 Y_tmp   = np.zeros(len(x_tmp))
 buffer  = max(RV_HARPS) - min(RV_HARPS)
 
 plt.figure()
-
+print('Calculating...')
 for n in range(n_file):
     
     # progress bar #
@@ -104,27 +105,24 @@ for n in range(n_file):
         shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')    
         continue
 
-    f           = CubicSpline( x - popt[1], y )                           # shift the observed spectrum in order to co-add to a template
+    f           = CubicSpline( x - popt[1], y )                                 # shift the observed spectrum in order to co-add to a template
     y_tmp       = f(x_tmp)
     Y_tmp       = Y_tmp + y_tmp
     
     if PLOT:
-        
-        x_sample   = np.append(np.arange(-0.9*RVW, -RVW, -0.1), np.arange(0.9*RVW, RVW, 0.1))
-        y_sample   = f(x_sample)
-        ave_sample = np.mean(y_sample)
-        plt.figure(); plt.plot(x_sample, y_sample, '.')
-#        plt.plot(x_tmp - RVC, y_tmp / ave_sample)   
- 
-#    plt.plot(x_tmp - RVC, y_tmp / ave_sample - Y_tmp)
+        if 1:
+            x_sample   = np.append(np.arange(-0.9*RVW, -RVW, -0.1), np.arange(0.9*RVW, RVW, 0.1))
+            y_sample   = f(x_sample)
+            ave_sample = np.mean(y_sample)
+    #        plt.figure(); plt.plot(x_sample, y_sample, '.')
+            plt.plot(x_tmp, y_tmp / ave_sample)   
+        if 0:
+            plt.plot(x_tmp, y_tmp / max(y_tmp)) 
+#    plt.plot(x_tmp, y_tmp / ave_sample - Y_tmp)
 
 
 writefile = ('../' + STAR + '/template1.dat')
 np.savetxt(writefile, Y_tmp)
-
-#Y_tmp_err   = Y_tmp**0.5
-#writefile = ('../' + STAR + '/template1_err.dat')
-#np.savetxt(writefile, Y_tmp_err)
 
 
 # Verification # 
