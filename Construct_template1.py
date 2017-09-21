@@ -5,11 +5,20 @@ Created on Fri Aug  4 10:46:40 2017
 
 @author: jzhao
 """
-# Update [-RVW/2, RV_HARPS[n], RVW/2, 1] @22/08/17
-# Flux varies by a factor of four even the exposure time remains the same for all observations - because the seeing changes @05/09/17
-# Introduce weights for fitting @05/09/17
-# Introduce buffer: idx_v = (v > RVC-RVW-0.1-buffer) & (v < RVC+RVW+0.1+buffer), so that (x - popt[1] + RVC) is within x_tmp @05/09/17
-# Normalized by an average instead of max(y) @05/09/17
+# @22/08/17
+# Update [-RVW/2, RV_HARPS[n], RVW/2, 1] 
+
+# @05/09/17
+# Flux varies by a factor of four even the exposure time remains the same for all observations - because the seeing changes 
+# Introduce weights for fitting
+# Introduce buffer: idx_v = (v > RVC-RVW-0.1-buffer) & (v < RVC+RVW+0.1+buffer), so that (x - popt[1] + RVC) is within x_tmp 
+# Normalized by an average instead of max(y)
+
+# @06/09/17
+# Test: Bi-sector 
+
+# 21/09/17
+# Comment: Previous work has obtained the first template
 
 
 import sys
@@ -22,6 +31,7 @@ from scipy.optimize import curve_fit
 from scipy.interpolate import CubicSpline
 import math
 from statistics import median
+import seaborn as sns
 
 #############################################
 def gaussian(x, a, mu, sigma, C):
@@ -36,7 +46,12 @@ MJD         = np.zeros(n_file)
 RV_g        = np.zeros(n_file)
 RV_HARPS    = np.zeros(n_file)
 FWHM_HARPS  = np.zeros(n_file)
+delta_y     = 0.01
+n_y         = int((1-0.51) / delta_y)
+ZZ          = np.zeros([n_file, n_y])
+
 PLOT        = True
+TEST        = True
 
 print('Reading data...')
 for n in range(n_file):
@@ -52,74 +67,107 @@ for n in range(n_file):
 print('\n')  
 
 RVC     = median(RV_HARPS)
-RVW     = median(FWHM_HARPS) * 1.4
+RVW     = median(FWHM_HARPS) * 1.3
 x_tmp   = np.arange(-RVW, RVW+0.1, 0.1)
 Y_tmp   = np.zeros(len(x_tmp))
 buffer  = max(RV_HARPS) - min(RV_HARPS)
 
 plt.figure()
 print('Calculating...')
-for n in range(n_file):
+with sns.cubehelix_palette(n_file):
+    for n in range(n_file):
+        
+        # progress bar #
+        sys.stdout.write('\r')
+        sys.stdout.write("[%-50s] %d%%" % ('='*int((n+1)*50./n_file), int((n+1)*100./n_file)))
+        sys.stdout.flush()    
+        
+        hdulist     = fits.open(FILE[n])
+        v0          = hdulist[0].header['CRVAL1']                                   # velocity on the left (N_STARting point)
+        v_noise     = hdulist[0].header['HIERARCH ESO DRS CCF NOISE'] * 1000        # RV_noise in m/s
+        STAR_read   = hdulist[0].header['OBJECT']
+        MJD[n]      = hdulist[0].header['MJD-OBS']
+        
+        # remove file if necessary
+        if STAR_read != STAR:
+            print (' Achtung! ' + STAR_read + ' instead of '+ STAR)
+            shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')
+            continue
+        
+        if v_noise > 5:
+            print(' Achtung! ' + STAR_read + ' too noisy')
+            shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')
+            continue
+        
+        if (RV_HARPS[n] > RVC+10) or (RV_HARPS[n] < RVC-10):
+            print(' Achtung! ' +  STAR_read + ' largely offset')
+            shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')
+            continue
     
-    # progress bar #
-    sys.stdout.write('\r')
-    sys.stdout.write("[%-50s] %d%%" % ('='*int((n+1)*50./n_file), int((n+1)*100./n_file)))
-    sys.stdout.flush()    
+        CCF         = hdulist[0].data                                               # ccf 2-d array
+        ccf         = CCF[- 1, :]                                                   # ccf 1-d array (whole range)
+        delta_v     = hdulist[0].header['CDELT1']                                   # velocity grid size 
+        
+        v           = v0 + np.arange(CCF.shape[1]) * delta_v                        # velocity array (whole range)
+        idx_v       = (v > RVC - RVW - buffer) & (v < RVC + RVW + 0.1 + buffer)
+        x           = v[idx_v]
+        y           = ccf[idx_v]
+        
+        popt, pcov  = curve_fit( gaussian, x, y, [-RVW/2 * max(y), RV_HARPS[n], RVW/2, 1], sigma = y**0.5, absolute_sigma = True)
+        RV_g[n]     = popt[1]
+        
+        if abs(RV_HARPS[n] - RV_g[n])*1000 > 5:
+            print(' Achtung! ' +  STAR_read + ' RV fitting issue')
+            shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')    
+            continue
     
-    hdulist     = fits.open(FILE[n])
-    v0          = hdulist[0].header['CRVAL1']                                   # velocity on the left (N_STARting point)
-    v_noise     = hdulist[0].header['HIERARCH ESO DRS CCF NOISE'] * 1000        # RV_noise in m/s
-    STAR_read   = hdulist[0].header['OBJECT']
-    MJD[n]      = hdulist[0].header['MJD-OBS']
+        f           = CubicSpline( x - popt[1], y )                                 # shift the observed spectrum in order to co-add to a template
+        y_tmp       = f(x_tmp)
+        Y_tmp       = Y_tmp + y_tmp
+        
+        if PLOT:
+            if 1:
+                x_sample   = np.append(np.arange(-0.9*RVW, -RVW, -0.1), np.arange(0.9*RVW, RVW, 0.1))
+                y_sample   = f(x_sample)
+                ave_sample = np.mean(y_sample)
+        #        plt.figure(); plt.plot(x_sample, y_sample, '.')
+#                plt.plot(x_tmp, y_tmp / ave_sample)
+            if 0:
+                plt.plot(x_tmp, y_tmp / max(y_tmp)) 
+    #    plt.plot(x_tmp, y_tmp / ave_sample - Y_tmp)
     
-    # remove file if necessary
-    if STAR_read != STAR:
-        print (' Achtung! ' + STAR_read + ' instead of '+ STAR)
-        shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')
-        continue
-    
-    if v_noise > 5:
-        print(' Achtung! ' + STAR_read + ' too noisy')
-        shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')
-        continue
-    
-    if (RV_HARPS[n] > RVC+10) or (RV_HARPS[n] < RVC-10):
-        print(' Achtung! ' +  STAR_read + ' largely offset')
-        shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')
-        continue
-
-    CCF         = hdulist[0].data                                               # ccf 2-d array
-    ccf         = CCF[- 1, :]                                                   # ccf 1-d array (whole range)
-    delta_v     = hdulist[0].header['CDELT1']                                   # velocity grid size 
-    
-    v           = v0 + np.arange(CCF.shape[1]) * delta_v                        # velocity array (whole range)
-    idx_v       = (v > RVC - RVW - buffer) & (v < RVC + RVW + 0.1 + buffer)
-    x           = v[idx_v]
-    y           = ccf[idx_v]
-    
-    popt, pcov  = curve_fit( gaussian, x, y, [-RVW/2 * max(y), RV_HARPS[n], RVW/2, 1], sigma = y**0.5, absolute_sigma = True)
-    RV_g[n]     = popt[1]
-    
-    if abs(RV_HARPS[n] - RV_g[n])*1000 > 5:
-        print(' Achtung! ' +  STAR_read + ' RV fitting issue')
-        shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')    
-        continue
-
-    f           = CubicSpline( x - popt[1], y )                                 # shift the observed spectrum in order to co-add to a template
-    y_tmp       = f(x_tmp)
-    Y_tmp       = Y_tmp + y_tmp
-    
-    if PLOT:
-        if 1:
-            x_sample   = np.append(np.arange(-0.9*RVW, -RVW, -0.1), np.arange(0.9*RVW, RVW, 0.1))
-            y_sample   = f(x_sample)
-            ave_sample = np.mean(y_sample)
-    #        plt.figure(); plt.plot(x_sample, y_sample, '.')
-            plt.plot(x_tmp, y_tmp / ave_sample)   
-        if 0:
-            plt.plot(x_tmp, y_tmp / max(y_tmp)) 
-#    plt.plot(x_tmp, y_tmp / ave_sample - Y_tmp)
-
+        # bi-sector
+        if TEST:
+            idx     = (x_tmp < 0)
+            x_up    = x_tmp[idx][::-1]                                              # revserse order
+            x_lo    = x_tmp[~idx]
+            y_test  = y_tmp / ave_sample
+            y_up    = y_test[idx][::-1]                                             # reverse the order of an array a[::-1]
+            y_lo    = y_test[~idx]
+#            y_smp   = np.linspace(min(y_test)+0.01, 0.99, num=50, endpoint=True)
+            y_smp   = np.linspace(0.51, 0.99, num = n_y, endpoint=True)
+            
+            f_up    = CubicSpline( y_up, x_up )
+            f_lo    = CubicSpline( y_lo, x_lo )
+            x_bi    = (f_up(y_smp) + f_lo(y_smp)) / 2
+#            x_bi    = x_bi - median(x_bi)
+            plt.plot(x_bi, y_smp)
+            ZZ[n,:] = x_bi
+            
+plt.figure()
+XX, YY = np.mgrid[slice(1, n_file+1, 1), slice(0.51, 1, delta_y)]
+plt.pcolormesh(XX, YY, ZZ, cmap='Greys', vmin=-0.015, vmax=0.015)
+plt.title('Bisector')
+# set the limits of the plot to the limits of the data
+#plt.axis([-10, 10, phase.min(), phase.max()])
+plt.xlabel('n_file')
+plt.ylabel('flux')
+plt.colorbar()
+plt.savefig('Bisector2.png', dpi=200)
+plt.show()            
+#        plt.scatter(x_bi, y_smp, c=np.zeros(50)+n, s=np.zeros(50)+1)
+        
+        
 
 writefile = ('../' + STAR + '/template1.dat')
 np.savetxt(writefile, Y_tmp)
