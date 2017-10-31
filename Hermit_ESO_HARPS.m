@@ -31,10 +31,13 @@ order_even      = array_order(idx_even);
 coeff           = zeros((ORDER+1), N_FILE);
 coeff_rvc       = zeros((ORDER+1), N_FILE);
 RV_gauss        = zeros(N_FILE,1);
-
+a_n             = zeros(N_FILE,1);
+b_n             = zeros(N_FILE,1);
+power           = zeros(N_FILE,1);
 
 grid_size       = 0.1;
 v               = (RVC-RVW : grid_size : RVC+RVW+0.1)';
+P = 2 * RVW;
 cd ../../code
 
 %%%%%%%%%%%%%%%%%%%%%%%%%
@@ -48,6 +51,10 @@ for n = 1:N_FILE
     i           = n - 1;
     filename    = ['../', star, '/4-ccf_dat/', char(dat_name(n))];
     A           = importdata(filename);
+    a_n(n)      = 2 / P * sum(A .* cos(2*pi*1*v/P)) * grid_size;
+    b_n(n)      = 2 / P * sum(A .* sin(2*pi*1*v/P)) * grid_size;
+    power(n)    = a_n(n)^2 + b_n(n)^2;
+    
     f           = fit( v, A, 'a*exp(-((x-b)/c)^2)+d', 'StartPoint', [1/RVW, RVC, RVW/2, 0] );
     % b           = f.b;  % shift
     b           = RV_HARPS(n);  % shift
