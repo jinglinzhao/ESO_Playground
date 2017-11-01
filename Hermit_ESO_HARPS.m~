@@ -10,7 +10,7 @@
 %%%%%%%%%%%%%%
 % Parameters %
 %%%%%%%%%%%%%%
-star        = 'Gl628';
+star        = 'HD41248';
 MJD         = importdata(['../', star, '/MJD.dat']);
 RV_HARPS    = importdata(['../', star, '/RV_HARPS.dat']);
 info 		= importdata(['../', star, '/info.dat']);
@@ -24,7 +24,7 @@ file_name   = {file_list.name};
 N_FILE      = size(file_name, 2);
 
 
-ORDER           = 11;                                                        % Highest Hermite order 
+ORDER           = 21;                                                        % Highest Hermite order 
 array_order     = 0:ORDER;
 idx_even        = mod(0:ORDER, 2) == 0;
 order_even      = array_order(idx_even);
@@ -154,11 +154,8 @@ for order = 0:ORDER
             end
             
             % Mark power peaks (green)
-            x_power = locs_power(idx_maxs_power(i));                              % locations of the largest peaks -> harmonics
-            y_power = pks_maxs_power(i); 
-            if (1/x_power<150) && (1/x_power>2)
-                text(1/x_power, -y_power, ['\leftarrow', num2str(1/x_power, '%3.2f')], 'fontsize', 8);    
-            end
+            x_rvc = locs_power(idx_maxs_power(i));                              % locations of the largest peaks -> harmonics
+            y_rvc = pks_maxs_power(i); 
         end
         
         xlabel('Frequency')
