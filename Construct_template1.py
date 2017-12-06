@@ -51,7 +51,7 @@ n_y         = int((1-0.51) / delta_y)
 ZZ          = np.zeros([n_file, n_y])
 
 PLOT        = True
-TEST        = True
+TEST        = False
 
 print('Reading data...')
 for n in range(n_file):
@@ -109,7 +109,7 @@ with sns.cubehelix_palette(n_file):
         delta_v     = hdulist[0].header['CDELT1']                                   # velocity grid size 
         
         v           = v0 + np.arange(CCF.shape[1]) * delta_v                        # velocity array (whole range)
-        idx_v       = (v > RVC - RVW - buffer) & (v < RVC + RVW + 0.1 + buffer)
+        idx_v       = (v > RVC - RVW - buffer) & (v < RVC + RVW + delta_v + buffer)
         x           = v[idx_v]
         y           = ccf[idx_v]
         
@@ -125,15 +125,29 @@ with sns.cubehelix_palette(n_file):
         y_tmp       = f(x_tmp)
         Y_tmp       = Y_tmp + y_tmp
         
+        
+        
         if PLOT:
-            if 1:
+            if 0:
                 x_sample   = np.append(np.arange(-0.9*RVW, -RVW, -0.1), np.arange(0.9*RVW, RVW, 0.1))
                 y_sample   = f(x_sample)
                 ave_sample = np.mean(y_sample)
         #        plt.figure(); plt.plot(x_sample, y_sample, '.')
 #                plt.plot(x_tmp, y_tmp / ave_sample)
-            if 0:
+            if 1:
                 plt.plot(x_tmp, y_tmp / max(y_tmp)) 
+                plt.title('Overplotted spectral line profile')
+                plt.xlabel('radial velocity [m/s]')
+                plt.ylabel('normalized flux')       
+
+                
+            if 0:
+                plt.plot(x_tmp, y_tmp / max(y_tmp) - Y_tmp0 / max(Y_tmp0)) 
+                plt.title('Residual')
+                plt.xlabel('radial velocity [km/s]')
+                plt.ylabel('flux')       
+                plt.savefig('Residual', dpi=200)      
+                
     #    plt.plot(x_tmp, y_tmp / ave_sample - Y_tmp)
     
         # bi-sector
@@ -154,17 +168,20 @@ with sns.cubehelix_palette(n_file):
             plt.plot(x_bi, y_smp)
             ZZ[n,:] = x_bi
             
-plt.figure()
-XX, YY = np.mgrid[slice(1, n_file+1, 1), slice(0.51, 1, delta_y)]
-plt.pcolormesh(XX, YY, ZZ, cmap='Greys', vmin=-0.015, vmax=0.015)
-plt.title('Bisector')
-# set the limits of the plot to the limits of the data
-#plt.axis([-10, 10, phase.min(), phase.max()])
-plt.xlabel('n_file')
-plt.ylabel('flux')
-plt.colorbar()
-plt.savefig('Bisector2.png', dpi=200)
-plt.show()            
+plt.savefig('Line Profile', dpi=200)
+                
+if TEST:            
+    plt.figure()
+    XX, YY = np.mgrid[slice(1, n_file+1, 1), slice(0.51, 1, delta_y)]
+    plt.pcolormesh(XX, YY, ZZ, cmap='Greys', vmin=-0.015, vmax=0.015)
+    plt.title('Bisector')
+    # set the limits of the plot to the limits of the data
+    #plt.axis([-10, 10, phase.min(), phase.max()])
+    plt.xlabel('n_file')
+    plt.ylabel('flux')
+    plt.colorbar()
+    plt.savefig('Bisector2.png', dpi=200)
+    plt.show()            
 #        plt.scatter(x_bi, y_smp, c=np.zeros(50)+n, s=np.zeros(50)+1)
         
         

@@ -39,7 +39,7 @@ def gaussian(x, a, mu, sigma, C):
 
 #############################################
 
-STAR        = 'HD189733'
+STAR        = 'Gl581'
 FILE        = glob.glob('../' + STAR + '/3-ccf_fits/*fits')
 n_file      = len(FILE)
 MJD         = np.zeros(n_file)
