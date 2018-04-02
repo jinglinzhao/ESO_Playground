@@ -39,7 +39,7 @@ def gaussian(x, a, mu, sigma, C):
     return val
 #############################################
 
-STAR        = 'HD189733'
+STAR        = 'Gl581'
 FILE        = glob.glob('../' + STAR + '/3-ccf_fits/*fits')
 n_file      = len(FILE)
 MJD         = np.zeros(n_file)
@@ -49,6 +49,7 @@ FWHM_HARPS  = np.zeros(n_file)
 delta_y     = 0.01
 n_y         = int((1-0.51) / delta_y)
 ZZ          = np.zeros([n_file, n_y])
+ccf_max     = np.zeros(n_file)
 
 PLOT        = True
 TEST        = False
@@ -106,6 +107,7 @@ with sns.cubehelix_palette(n_file):
     
         CCF         = hdulist[0].data                                               # ccf 2-d array
         ccf         = CCF[- 1, :]                                                   # ccf 1-d array (whole range)
+        ccf_max[n]  = max(ccf / 1000000)
         delta_v     = hdulist[0].header['CDELT1']                                   # velocity grid size 
         
         v           = v0 + np.arange(CCF.shape[1]) * delta_v                        # velocity array (whole range)
@@ -196,3 +198,8 @@ if 0:
     plt.plot( RV_g[~idx] *1000, RV_HARPS[~idx] * 1000, '+')
     plt.plot(MJD[~idx], RV_g[~idx] *1000, '.', MJD[~idx], RV_HARPS[~idx] * 1000, '+')
     plt.show()
+    
+    
+plt.hist(ccf_max, bins='auto')  # arguments are passed to np.histogram
+plt.title("Histogram with 'auto' bins")
+plt.show()    
