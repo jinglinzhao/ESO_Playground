@@ -39,7 +39,7 @@ def gaussian(x, a, mu, sigma, C):
 
 #############################################
 
-STAR        = 'HD189733'
+STAR        = 'HD7449'
 FILE        = glob.glob('../' + STAR + '/3-ccf_fits/*fits')
 n_file      = len(FILE)
 MJD         = np.zeros(n_file)
@@ -63,6 +63,7 @@ RVC = median(RV_HARPS)
 RVW = median(FWHM_HARPS) * 1.5
 x   = np.arange(RVC-RVW, RVC+RVW+0.1, 0.1)
 y   = np.zeros(len(x))
+RV_noise = np.zeros(n_file)
 
 plt.figure()
 
@@ -75,23 +76,44 @@ for n in range(n_file):
     
     hdulist     = fits.open(FILE[n])
     v0          = hdulist[0].header['CRVAL1']                                   # velocity on the left (N_STARting point)
+    print(v0)
     RV_HARPS[n] = hdulist[0].header['HIERARCH ESO DRS CCF RVC']                 # Baryc RV (drift corrected) (km/s)
-    v_noise     = hdulist[0].header['HIERARCH ESO DRS CCF NOISE'] * 1000        # RV_noise in m/s
+    RV_noise[n] = hdulist[0].header['HIERARCH ESO DRS CCF NOISE'] * 1000        # RV_noise in m/s
     STAR_read   = hdulist[0].header['OBJECT']
     
     # remove file if necessary
-    if STAR_read != STAR:
+    # if (STAR_read != STAR) and (STAR_read != 'HD-10700') and (STAR_read != 'HR509') and (STAR_read != 'TauCeti') \
+    #     and (STAR_read != 'Tau-Cet') and (STAR_read != 'TAUCET') and (STAR_read != 'tau-Cet') \
+    #     and (STAR_read != 'Tau-Ceti') and (STAR_read != 'HD049933'):
+    #     print (' Achtung! ' + STAR_read + ' instead of '+ STAR)
+    #     shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')
+    #     continue
+    if (STAR_read != STAR):
         print (' Achtung! ' + STAR_read + ' instead of '+ STAR)
         shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')
-        continue
+        continue        
     
-    if v_noise > 5:
+    if RV_noise[n] > 10:
         print(' Achtung! ' + STAR_read + ' too noisy')
         shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')
         continue
     
     if (RV_HARPS[n] > RVC+10) or (RV_HARPS[n] < RVC-10):
         print(' Achtung! ' +  STAR_read + ' largely offset')
+        shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')
+        continue
+
+    # if (v0 > 11.1) or (v0 < 10.9):
+    #     print(' Achtung! ' +  STAR_read + ' initial velocity mismatch ')
+    #     shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')
+    #     continue
+
+    quartile_1, quartile_3 = np.percentile(RV_HARPS, [25, 75])
+    iqr = quartile_3 - quartile_1
+    lower_bound = quartile_1 - (iqr * 10)
+    upper_bound = quartile_3 + (iqr * 10)
+    if (RV_HARPS[n] < lower_bound) or (RV_HARPS[n] > upper_bound):
+        print(' Achtung! ' +  STAR_read + ' odd offset')
         shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')
         continue
 
@@ -115,23 +137,31 @@ for n in range(n_file):
     x_new       = x
     y_new       = (y - popt[3]) / popt[0]
     plt.plot(x_new, y_new, '-')
-    
+
     output_name = FILE[n]
     output_name = output_name.replace('3-ccf_fits', '4-ccf_dat')
     writefile   = output_name.replace('.fits', '.dat')
     np.savetxt(writefile, y_new)
     
-    MJD[n]      = hdulist[0].header['MJD-OBS']
+    MJD[n]      = hdulist[0].header['MJD-OBS']                              # modified Julian Date (JD - 2400000.5)
+    print(min(ccf)**0.5)
 
+plt.show()
 print('\n')        
 idx = (MJD == 0)
 np.savetxt('../' + STAR + '/info.dat', [RVC, RVW])
 np.savetxt('../' + STAR + '/MJD.dat', MJD[~idx])
 np.savetxt('../' + STAR + '/RV_HARPS.dat', RV_HARPS)
+np.savetxt('../' + STAR + '/x.dat', x)
+np.savetxt('../' + STAR + '/RV_noise.dat', RV_noise)
+
 
 # Verification # 
 if 0:
     plt.plot( RV_g[~idx] *1000, RV_HARPS[~idx] * 1000, '+')
-    plt.plot(MJD[~idx], RV_g[~idx] *1000, '.', MJD[~idx], RV_HARPS[~idx] * 1000, '+')
+    plt.plot(MJD[~idx], RV_g[~idx] *1000 - np.mean(RV_g[~idx] *1000), '.', MJD[~idx], RV_HARPS[~idx] * 1000 - np.mean(RV_g[~idx] *1000), '+')
     plt.plot(MJD[~idx], (RV_g[~idx] - RV_HARPS[~idx]) * 1000, '.')
     plt.show()
+    plt.errorbar(MJD[~idx], RV_g[~idx] *1000 - np.mean(RV_g[~idx] *1000), yerr=RV_noise[~idx], fmt=".k", capsize=0)
+    plt.show()
+
