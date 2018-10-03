@@ -39,7 +39,7 @@ def gaussian(x, a, mu, sigma, C):
 
 #############################################
 
-STAR        = 'HD7449'
+STAR        = 'HD22049'
 FILE        = glob.glob('../' + STAR + '/3-ccf_fits/*fits')
 n_file      = len(FILE)
 MJD         = np.zeros(n_file)
@@ -68,6 +68,7 @@ RV_noise = np.zeros(n_file)
 plt.figure()
 
 for n in range(n_file):
+# for n in np.arange(n_file-3)+3:    
     
     # progress bar #
     sys.stdout.write('\r')
@@ -77,8 +78,6 @@ for n in range(n_file):
     hdulist     = fits.open(FILE[n])
     v0          = hdulist[0].header['CRVAL1']                                   # velocity on the left (N_STARting point)
     print(v0)
-    RV_HARPS[n] = hdulist[0].header['HIERARCH ESO DRS CCF RVC']                 # Baryc RV (drift corrected) (km/s)
-    RV_noise[n] = hdulist[0].header['HIERARCH ESO DRS CCF NOISE'] * 1000        # RV_noise in m/s
     STAR_read   = hdulist[0].header['OBJECT']
     
     # remove file if necessary
@@ -88,18 +87,21 @@ for n in range(n_file):
     #     print (' Achtung! ' + STAR_read + ' instead of '+ STAR)
     #     shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')
     #     continue
-    if (STAR_read != STAR):
-        print (' Achtung! ' + STAR_read + ' instead of '+ STAR)
-        shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')
-        continue        
+
+    # if (STAR_read != STAR):
+    #     print (' Achtung! ' + STAR_read + ' instead of '+ STAR)
+    #     shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')
+    #     continue        
     
-    if RV_noise[n] > 10:
-        print(' Achtung! ' + STAR_read + ' too noisy')
-        shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')
-        continue
-    
+    RV_HARPS[n] = hdulist[0].header['HIERARCH ESO DRS CCF RVC']                 # Baryc RV (drift corrected) (km/s)
     if (RV_HARPS[n] > RVC+10) or (RV_HARPS[n] < RVC-10):
         print(' Achtung! ' +  STAR_read + ' largely offset')
+        shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')
+        continue
+
+    RV_noise[n] = hdulist[0].header['HIERARCH ESO DRS CCF NOISE'] * 1000        # RV_noise in m/s    
+    if RV_noise[n] > 10:
+        print(' Achtung! ' + STAR_read + ' too noisy')
         shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')
         continue
 
@@ -146,14 +148,19 @@ for n in range(n_file):
     MJD[n]      = hdulist[0].header['MJD-OBS']                              # modified Julian Date (JD - 2400000.5)
     print(min(ccf)**0.5)
 
+    if max(y_new>0.12):
+        print(' Achtung! ' +  STAR_read + ' outlier?')
+        shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')    
+        continue        
+
 plt.show()
 print('\n')        
 idx = (MJD == 0)
 np.savetxt('../' + STAR + '/info.dat', [RVC, RVW])
 np.savetxt('../' + STAR + '/MJD.dat', MJD[~idx])
-np.savetxt('../' + STAR + '/RV_HARPS.dat', RV_HARPS)
+np.savetxt('../' + STAR + '/RV_HARPS.dat', RV_HARPS[~idx])
 np.savetxt('../' + STAR + '/x.dat', x)
-np.savetxt('../' + STAR + '/RV_noise.dat', RV_noise)
+np.savetxt('../' + STAR + '/RV_noise.dat', RV_noise[~idx])
 
 
 # Verification # 
