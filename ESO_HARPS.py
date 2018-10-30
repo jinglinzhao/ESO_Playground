@@ -39,7 +39,9 @@ def gaussian(x, a, mu, sigma, C):
 
 #############################################
 
-STAR        = 'HD22049'
+STAR        = 'HD128621'
+# DIR         = 'HD128621_1_..2010-03-23'
+# FILE        = glob.glob('../' + DIR + '/3-ccf_fits/*fits')
 FILE        = glob.glob('../' + STAR + '/3-ccf_fits/*fits')
 n_file      = len(FILE)
 MJD         = np.zeros(n_file)
@@ -88,11 +90,12 @@ for n in range(n_file):
     #     shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')
     #     continue
 
-    # if (STAR_read != STAR):
-    #     print (' Achtung! ' + STAR_read + ' instead of '+ STAR)
-    #     shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')
-    #     continue        
-    
+
+    if (STAR_read != STAR) and (STAR_read != 'HR5460'):
+        print (' Achtung! ' + STAR_read + ' instead of '+ STAR)
+        shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')
+        continue        
+
     RV_HARPS[n] = hdulist[0].header['HIERARCH ESO DRS CCF RVC']                 # Baryc RV (drift corrected) (km/s)
     if (RV_HARPS[n] > RVC+10) or (RV_HARPS[n] < RVC-10):
         print(' Achtung! ' +  STAR_read + ' largely offset')
@@ -100,7 +103,7 @@ for n in range(n_file):
         continue
 
     RV_noise[n] = hdulist[0].header['HIERARCH ESO DRS CCF NOISE'] * 1000        # RV_noise in m/s    
-    if RV_noise[n] > 10:
+    if RV_noise[n] > 3:
         print(' Achtung! ' + STAR_read + ' too noisy')
         shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')
         continue
@@ -110,14 +113,15 @@ for n in range(n_file):
     #     shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')
     #     continue
 
-    quartile_1, quartile_3 = np.percentile(RV_HARPS, [25, 75])
-    iqr = quartile_3 - quartile_1
-    lower_bound = quartile_1 - (iqr * 10)
-    upper_bound = quartile_3 + (iqr * 10)
-    if (RV_HARPS[n] < lower_bound) or (RV_HARPS[n] > upper_bound):
-        print(' Achtung! ' +  STAR_read + ' odd offset')
-        shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')
-        continue
+    if 0: # test
+        quartile_1, quartile_3 = np.percentile(RV_HARPS, [25, 75])
+        iqr = quartile_3 - quartile_1
+        lower_bound = quartile_1 - (iqr * 10)
+        upper_bound = quartile_3 + (iqr * 10)
+        if (RV_HARPS[n] < lower_bound) or (RV_HARPS[n] > upper_bound):
+            print(' Achtung! ' +  STAR_read + ' odd offset')
+            shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')
+            continue
 
     CCF         = hdulist[0].data                                               # ccf 2-d array
     ccf         = CCF[- 1, :]                                                   # ccf 1-d array (whole range)
@@ -135,7 +139,22 @@ for n in range(n_file):
         print(' Achtung! ' +  STAR_read + ' RV fitting issue')
         shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')    
         continue
-        
+
+    # valid for HD128621_3_2010-06-13..2012-12-31
+    # if RV_HARPS[n] *1000 > 250:
+    #     print(' Achtung! ' +  STAR_read + ' outlier')
+    #     shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')    
+    #     continue        
+
+    MJD[n]      = hdulist[0].header['MJD-OBS']                              # modified Julian Date (JD - 2400000.5)
+    # valid for HD128621_3_2010-06-13..2012-12-31
+    # if ((MJD[n] > 55700) or (MJD[n] < 55600)):
+    # valid for part 1 [part]
+    if ((MJD[n] > 55100) or (MJD[n] < 54850)):        
+        print(' Achtung! ' +  STAR_read + ' not selected')
+        shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')    
+        continue
+
     x_new       = x
     y_new       = (y - popt[3]) / popt[0]
     plt.plot(x_new, y_new, '-')
@@ -144,23 +163,25 @@ for n in range(n_file):
     output_name = output_name.replace('3-ccf_fits', '4-ccf_dat')
     writefile   = output_name.replace('.fits', '.dat')
     np.savetxt(writefile, y_new)
-    
-    MJD[n]      = hdulist[0].header['MJD-OBS']                              # modified Julian Date (JD - 2400000.5)
+
     print(min(ccf)**0.5)
 
-    if max(y_new>0.12):
-        print(' Achtung! ' +  STAR_read + ' outlier?')
-        shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')    
-        continue        
+    # set valid to HD22049 (epslon Eri)
+    # if max(y_new>0.12): 
+    #     print(' Achtung! ' +  STAR_read + ' outlier?')
+    #     shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')    
+    #     continue        
 
 plt.show()
 print('\n')        
-idx = (MJD == 0)
+# idx = (MJD == 0)
+idx = (MJD > 55100) | (MJD < 54850) | (MJD == 0);
 np.savetxt('../' + STAR + '/info.dat', [RVC, RVW])
 np.savetxt('../' + STAR + '/MJD.dat', MJD[~idx])
 np.savetxt('../' + STAR + '/RV_HARPS.dat', RV_HARPS[~idx])
 np.savetxt('../' + STAR + '/x.dat', x)
 np.savetxt('../' + STAR + '/RV_noise.dat', RV_noise[~idx])
+np.savetxt('../' + STAR + '/FWHM.dat', FWHM_HARPS[~idx])
 
 
 # Verification # 
@@ -170,5 +191,7 @@ if 0:
     plt.plot(MJD[~idx], (RV_g[~idx] - RV_HARPS[~idx]) * 1000, '.')
     plt.show()
     plt.errorbar(MJD[~idx], RV_g[~idx] *1000 - np.mean(RV_g[~idx] *1000), yerr=RV_noise[~idx], fmt=".k", capsize=0)
+    plt.errorbar(MJD, RV_HARPS *1000, yerr=RV_noise, fmt=".k", capsize=0)
+    plt.errorbar(MJD[~idx], RV_HARPS[~idx] *1000 - np.mean(RV_HARPS[~idx] *1000), yerr=RV_noise[~idx], fmt=".k", capsize=0)
     plt.show()
 
