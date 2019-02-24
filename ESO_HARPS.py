@@ -39,15 +39,18 @@ def gaussian(x, a, mu, sigma, C):
 
 #############################################
 
-STAR        = 'HD216770'
+STAR        = 'HD224789'
 # DIR         = 'HD128621_1_..2010-03-23'
 # FILE        = glob.glob('../' + DIR + '/3-ccf_fits/*fits')
+FILE0       = glob.glob('../' + STAR + '/1-download/*fits')
 FILE        = glob.glob('../' + STAR + '/3-ccf_fits/*fits')
 n_file      = len(FILE)
 MJD         = np.zeros(n_file)
 RV_g        = np.zeros(n_file)
 RV_HARPS    = np.zeros(n_file)
 FWHM_HARPS  = np.zeros(n_file)
+SN          = np.zeros(n_file)
+SNR         = np.zeros(len(FILE0))
 
 for n in range(n_file):
     # progress bar #
@@ -57,7 +60,18 @@ for n in range(n_file):
     
     hdulist     	= fits.open(FILE[n])
     RV_HARPS[n] 	= hdulist[0].header['HIERARCH ESO DRS CCF RVC']                 # Baryc RV (drift corrected) (km/s)
-    FWHM_HARPS[n] = hdulist[0].header['HIERARCH ESO DRS CCF FWHM']
+    FWHM_HARPS[n]   = hdulist[0].header['HIERARCH ESO DRS CCF FWHM']
+    hdulist0        = fits.open(FILE0[n])
+    SNR[n]          = hdulist0[0].header['SNR'] 
+
+if 0: # to obtain the medin SNR of HD189733
+    t = np.zeros(len(FILE0))
+    for n in range(len(FILE0)):
+        hdulist0        = fits.open(FILE0[n])
+        t[n]    = hdulist0[0].header['MJD-OBS']
+        SNR[n]  = hdulist0[0].header['SNR']
+    idx = (t<54341.11) & (t>54340.98)
+    np.median(SNR[idx])
 
 print('\n')    
 
@@ -79,7 +93,7 @@ for n in range(n_file):
     
     hdulist     = fits.open(FILE[n])
     v0          = hdulist[0].header['CRVAL1']                                   # velocity on the left (N_STARting point)
-    print(v0)
+    print(' ', v0)
     STAR_read   = hdulist[0].header['OBJECT']
     
     # remove file if necessary
@@ -103,7 +117,7 @@ for n in range(n_file):
         continue
 
     RV_noise[n] = hdulist[0].header['HIERARCH ESO DRS CCF NOISE'] * 1000        # RV_noise in m/s    
-    if RV_noise[n] > 5:
+    if RV_noise[n] > 10:
         print(' Achtung! ' + STAR_read + ' too noisy')
         shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')
         continue
@@ -128,7 +142,9 @@ for n in range(n_file):
     delta_v     = hdulist[0].header['CDELT1']                                   # velocity grid size 
     v           = v0 + np.arange(CCF.shape[1]) * delta_v                        # velocity array (whole range)
     # plt.plot(v,ccf)
-    print(min(ccf)**0.5)
+    SN[n]       = max(ccf)**0.5
+    print(SN[n])
+
 
     f           = CubicSpline(v, ccf / ccf.max())
     y           = f(x)
@@ -166,7 +182,8 @@ for n in range(n_file):
 
     if 0: 
     # valid for HD189733
-        if (MJD[n] < 53986.01) or (MJD[n] > 53990):
+        if (MJD[n] < 54340.98) or (MJD[n] > 54341.11): # section 4
+        # if (MJD[n] < 53986) or (MJD[n] > 53990): # section 2
     # valid for HD128621_3_2010-06-13..2012-12-31
         # if ((MJD[n] > 55700) or (MJD[n] < 55600)):
     # valid for HD128621_1_..2010-03-23
@@ -175,7 +192,7 @@ for n in range(n_file):
             shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')    
             continue
 
-    if 0:
+    if 1:
         if (MJD[n] > 57161):
             print(' Achtung! ' +  STAR_read + ' fibre upgrade')
             shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')    
@@ -200,6 +217,10 @@ np.savetxt('../' + STAR + '/FWHM.dat', FWHM_HARPS[~idx])
 output  = np.vstack((MJD[~idx], (RV_HARPS[~idx]-np.mean(RV_HARPS[~idx]))*1000, RV_noise[~idx]))
 output = np.transpose(output)
 np.savetxt('../' + STAR + '/' + STAR + '.txt', output, fmt='%1.8f')
+
+print('SNR median = {0:.0f}'.format(np.median(SNR)))
+print('S/N median = {0:.0f}'.format(np.median(SN)))
+print('RV_noise median = {0:.2f} m/s'.format(np.median(RV_noise)))
 
 
 # Verification # 
