@@ -10,13 +10,13 @@
 %%%%%%%%%%%%%%
 % Parameters %
 %%%%%%%%%%%%%%
-star        = 'HD41248';
+% star        = 'HD41248';
+star        = 'Gl628';
 MJD         = importdata(['../', star, '/MJD.dat']);
 RV_HARPS    = importdata(['../', star, '/RV_HARPS.dat']);
 info 		= importdata(['../', star, '/info.dat']);
 RVC 		= info(1);
 RVW 		= info(2);
-
 
 cd (['../', star, '/3-ccf_fits/'])
 file_list   = dir('*.fits');

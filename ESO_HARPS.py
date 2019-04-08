@@ -39,9 +39,7 @@ def gaussian(x, a, mu, sigma, C):
 
 #############################################
 
-STAR        = 'HD224789'
-# DIR         = 'HD128621_1_..2010-03-23'
-# FILE        = glob.glob('../' + DIR + '/3-ccf_fits/*fits')
+STAR        = 'Gl479'
 FILE0       = glob.glob('../' + STAR + '/1-download/*fits')
 FILE        = glob.glob('../' + STAR + '/3-ccf_fits/*fits')
 n_file      = len(FILE)
@@ -117,7 +115,7 @@ for n in range(n_file):
         continue
 
     RV_noise[n] = hdulist[0].header['HIERARCH ESO DRS CCF NOISE'] * 1000        # RV_noise in m/s    
-    if RV_noise[n] > 10:
+    if RV_noise[n] > 5:
         print(' Achtung! ' + STAR_read + ' too noisy')
         shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')
         continue
@@ -227,6 +225,7 @@ print('RV_noise median = {0:.2f} m/s'.format(np.median(RV_noise)))
 if 0:
     plt.errorbar(MJD[~idx], RV_g[~idx] *1000 - np.mean(RV_g[~idx] *1000), yerr=RV_noise[~idx], fmt=".k", capsize=0)
     plt.errorbar(MJD, RV_HARPS *1000, yerr=RV_noise, fmt=".k", capsize=0)
+    plt.errorbar(MJD[idx], RV_HARPS[idx] *1000 - np.mean(RV_HARPS[~idx] *1000), yerr=RV_noise[idx], fmt=".r", capsize=0, alpha=0.3)
     plt.errorbar(MJD[~idx], RV_HARPS[~idx] *1000 - np.mean(RV_HARPS[~idx] *1000), yerr=RV_noise[~idx], fmt=".k", capsize=0, alpha=0.3)
     plt.show()
     # idx2 = (MJD[~idx] > 53986) & (MJD[~idx] < 53990)
