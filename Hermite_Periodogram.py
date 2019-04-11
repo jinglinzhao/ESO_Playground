@@ -9,7 +9,12 @@ from PyAstronomy.pyTiming import pyPeriod
 
 # STAR 		= 'Gl628'
 # STAR 		= 'HD103720'
-STAR 		= 'Gl358'
+# STAR 		= 'Gl358'
+# STAR 		= 'Gl479'
+# STAR 		= 'Gl581'
+# STAR 		= 'Gl674'
+# STAR 		= 'Gl176'
+STAR 		= 'Gl388'
 MJD     	= np.loadtxt('../' + STAR + '/MJD.dat')
 RV_HARPS 	= np.loadtxt('../' + STAR + '/RV_HARPS.dat')
 RV_noise 	= np.loadtxt('../' + STAR + '/RV_noise.dat')
@@ -36,7 +41,7 @@ clp = pyPeriod.Gls((MJD, RV_HARPS, RV_noise), norm = "ZK", Pbeg=Pbeg, Pend=Pend)
 clp.info()
 
 # Define FAP levels of 10%, 5%, and 1%
-fapLevels = np.array([0.01, 0.001, 0.0001])
+fapLevels = np.array([0.5, 0.01, 0.001, 0.0001])
 # Obtain the associated power thresholds
 plevels = clp.powerLevel(fapLevels)
 
@@ -86,10 +91,12 @@ for i in range(ORDER):
 	plt.xlim(Pbeg, Pend)
 
 	for j in range(len(fapLevels)):
-	    plt.plot([min(1/clp.freq), max(1/clp.freq)], [plevels[j]]*2, '--',
-	    label="FAP = %4.2f%%" % (fapLevels[j]*100))
+		if fapLevels[j] == 0.5:
+			plt.plot([min(1/clp.freq), max(1/clp.freq)], [plevels_c[j]]*2, '--', label="FAP = %d%%" % (fapLevels[j]*100))
+		else:
+			plt.plot([min(1/clp.freq), max(1/clp.freq)], [plevels_c[j]]*2, '--', label="FAP = %4.2f%%" % (fapLevels[j]*100))
 
-	    np.savetxt('../' + STAR + '/power' + str(i) + '.out', clp_c.power)
+		np.savetxt('../' + STAR + '/power' + str(i) + '.out', clp_c.power)
 
 	plt.legend()
 	plt.savefig('../' + STAR + '/' + STAR + '_Order' + str(i) +'.png')
@@ -97,3 +104,4 @@ for i in range(ORDER):
 	# plt.show()
 
 np.savetxt('../' + STAR + '/frequency.out', clp_c.freq)
+np.savetxt('../' + STAR + '/FAP_50.out', plevels_c)
