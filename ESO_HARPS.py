@@ -39,7 +39,10 @@ def gaussian(x, a, mu, sigma, C):
 
 #############################################
 
-STAR        = 'Gl479'
+# STAR        = 'Gl674'
+# STAR        = 'Gl388'
+STAR        = 'Gl176'
+
 FILE0       = glob.glob('../' + STAR + '/1-download/*fits')
 FILE        = glob.glob('../' + STAR + '/3-ccf_fits/*fits')
 n_file      = len(FILE)
@@ -150,7 +153,7 @@ for n in range(n_file):
     # plt.plot(x, y, x, gaussian(x, *popt))
     RV_g[n]     = popt[1]
     
-    if abs(RV_HARPS[n] - RV_g[n])*1000 > 5:
+    if abs(RV_HARPS[n] - RV_g[n])*1000 > 10:
         print(' Achtung! ' +  STAR_read + ' RV fitting issue')
         shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')    
         continue
@@ -247,8 +250,35 @@ if 0:
 
 
 
+from PyAstronomy.pyTiming import pyPeriod
+Pbeg = 2
+Pend = max(MJD[~idx]) - min(MJD[~idx])
 
+# Compute the GLS periodogram with default options.
+# Choose Zechmeister-Kuerster normalization explicitly
+# clp = pyPeriod.Gls((MJD, RV_HARPS, RV_noise), norm = "ZK", Pbeg=Pbeg, Pend=Pend)
+clp = pyPeriod.Gls((MJD[~idx], RV_HARPS[~idx], RV_noise[~idx]), norm = "ZK", Pbeg=Pbeg, Pend=Pend)
+# Print helpful information to screen
+clp.info()
 
+# Define FAP levels of 10%, 5%, and 1%
+fapLevels = np.array([0.5, 0.01, 0.001, 0.0001])
+# Obtain the associated power thresholds
+plevels = clp.powerLevel(fapLevels)
+
+ax = plt.subplot(111)
+plt.plot(1/clp.freq, clp.power, 'k-', linewidth=1, alpha=0.5)
+plt.xlabel('Period [days]')
+plt.ylabel("Power")
+plt.title(STAR)
+ax.set_xscale('log')
+for j in range(len(fapLevels)):
+    if fapLevels[j] == 0.5:
+        plt.plot([min(1/clp.freq), max(1/clp.freq)], [plevels[j]]*2, '--', label="FAP = %d%%" % (fapLevels[j]*100))
+    else:
+        plt.plot([min(1/clp.freq), max(1/clp.freq)], [plevels[j]]*2, '--', label="FAP = %4.2f%%" % (fapLevels[j]*100))
+plt.legend()
+plt.show()
 
 
 
