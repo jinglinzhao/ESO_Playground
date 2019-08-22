@@ -39,9 +39,18 @@ def gaussian(x, a, mu, sigma, C):
 
 #############################################
 
+# STAR        = 'HD224789'
+STAR        = 'HD103720'
+# STAR        = 'HD216770'
+# STAR        = 'BD-213153'
+# STAR        = 'HD200143'
 # STAR        = 'Gl674'
 # STAR        = 'Gl388'
-STAR        = 'Gl176'
+# STAR        = 'Gl176'
+# STAR            = 'Gl358'
+# STAR            = 'Gl479'
+# STAR        = 'HD189733'
+
 
 FILE0       = glob.glob('../' + STAR + '/1-download/*fits')
 FILE        = glob.glob('../' + STAR + '/3-ccf_fits/*fits')
@@ -51,7 +60,7 @@ RV_g        = np.zeros(n_file)
 RV_HARPS    = np.zeros(n_file)
 FWHM_HARPS  = np.zeros(n_file)
 SN          = np.zeros(n_file)
-SNR         = np.zeros(len(FILE0))
+SNR         = np.zeros(len(FILE))
 
 for n in range(n_file):
     # progress bar #
@@ -64,6 +73,10 @@ for n in range(n_file):
     FWHM_HARPS[n]   = hdulist[0].header['HIERARCH ESO DRS CCF FWHM']
     hdulist0        = fits.open(FILE0[n])
     SNR[n]          = hdulist0[0].header['SNR'] 
+
+    SN_order = np.zeros(72)
+    for i in range(72):
+        SN_order[i] = hdulist0[0].header['HIERARCH ESO DRS SPE EXT SN' + str(i)]
 
 if 0: # to obtain the medin SNR of HD189733
     t = np.zeros(len(FILE0))
@@ -81,6 +94,7 @@ RVW = median(FWHM_HARPS) * 1.5
 x   = np.arange(RVC-RVW, RVC+RVW+0.1, 0.1)
 y   = np.zeros(len(x))
 RV_noise = np.zeros(n_file)
+V_span = np.zeros(n_file)
 
 plt.figure()
 
@@ -205,6 +219,28 @@ for n in range(n_file):
     writefile   = output_name.replace('.fits', '.dat')
     np.savetxt(writefile, y_new)
 
+
+    # Calculate Vspan:
+    # σ is the width of the CCF
+    # I take σ as the FWHM
+
+    # the upper part of the CCF is defined in the range [–∞:–1σ][+1σ:+∞] 
+    idx     = (v < (RV_HARPS[n] - FWHM_HARPS[n])) + (v > (RV_HARPS[n] + FWHM_HARPS[n]))
+    x_span  = v[idx]
+    y_span  = ccf[idx]/ccf.max()
+    popt, pcov  = curve_fit( gaussian, x_span, y_span, [-RVW/2, RV_HARPS[n], RVW/2, 1])
+    V_high = popt[1]
+
+    # the lower part is defined in the range given by [–∞:-3σ][–1σ:+1σ][+3σ:+∞].
+    idx     = (v < (RV_HARPS[n] - 3*FWHM_HARPS[n])) + (v > (RV_HARPS[n] + 3*FWHM_HARPS[n])) + (v > (RV_HARPS[n] - FWHM_HARPS[n])) * (v < (RV_HARPS[n] + FWHM_HARPS[n]))
+    x_span  = v[idx]
+    y_span  = ccf[idx]/ccf.max()
+    popt, pcov  = curve_fit( gaussian, x_span, y_span, [-RVW/2, RV_HARPS[n], RVW/2, 1])
+    V_low = popt[1]
+    V_span[n] = (V_high - V_low) * 1000
+
+
+
 plt.show()
 print('\n')        
 idx = (MJD == 0)
@@ -215,6 +251,7 @@ np.savetxt('../' + STAR + '/RV_HARPS.dat', RV_HARPS[~idx])
 np.savetxt('../' + STAR + '/x.dat', x)
 np.savetxt('../' + STAR + '/RV_noise.dat', RV_noise[~idx])
 np.savetxt('../' + STAR + '/FWHM.dat', FWHM_HARPS[~idx])
+np.savetxt('../' + STAR + '/V_span.dat', V_span[~idx])
 output  = np.vstack((MJD[~idx], (RV_HARPS[~idx]-np.mean(RV_HARPS[~idx]))*1000, RV_noise[~idx]))
 output = np.transpose(output)
 np.savetxt('../' + STAR + '/' + STAR + '.txt', output, fmt='%1.8f')
@@ -252,7 +289,8 @@ if 0:
 
 from PyAstronomy.pyTiming import pyPeriod
 Pbeg = 2
-Pend = max(MJD[~idx]) - min(MJD[~idx])
+# Pend = max(MJD[~idx]) - min(MJD[~idx])
+Pend = 20
 
 # Compute the GLS periodogram with default options.
 # Choose Zechmeister-Kuerster normalization explicitly
