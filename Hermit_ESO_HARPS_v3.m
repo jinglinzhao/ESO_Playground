@@ -6,14 +6,14 @@
 %%%%%%%%%%%%%%
 % Parameters %
 %%%%%%%%%%%%%%
-% star        = 'Gl628';
+star        = 'Gl628';
 % star        = 'HD103720';
 % star        = 'Gl358';
 % star        = 'Gl479';
 % star        = 'Gl581';
 % star        = 'Gl674';
 % star        = 'Gl176';
-star        = 'Gl388';
+% star        = 'Gl388';
 MJD         = importdata(['../', star, '/MJD.dat']);
 RV_HARPS    = importdata(['../', star, '/RV_HARPS.dat']);
 info 		= importdata(['../', star, '/info.dat']);
@@ -89,7 +89,7 @@ x_idx = x > 0 ; % use all the frequencies returned from the python script.
 order = 0:2:20;
 vmax = max(max(power_fre(:, x_idx)));
 
-SMOOTH = 0;
+SMOOTH = 0; % not recommended to set SMOOTH on because the smoothing can overshoot.
 
 for vmin = [0, FAP_val(1)]
 
@@ -120,43 +120,66 @@ for vmin = [0, FAP_val(1)]
 %         [X_fft,Y_fft] = meshgrid(x(x_idx), order);
 %         h = pcolor(log(X_fft),Y_fft,   power_fre(order+1, x_idx) );
         set(h, 'edgecolor', 'none');
-    %     colormap(gray)
+        colormap(flipud(gray))
 %         h.FaceColor = 'interp';
         colorbar;
         caxis([vmin vmax]);
         ylabel('Even orders');
-        title([star(1:2), ' ', star(3:end)])
-        if strcmp(star, 'HD103720')
-            xticks([log(4.557), log(10), log(100),log(200)])
-            xticklabels({'4.557', '10', '100','200'})    
+        xticks([log(10), log(100),log(1000)])
+        if strcmp(star, 'Gl628')
+            title('Wolf 1061')
+        elseif strcmp(star(1:2), 'Gl')
+            title(['GJ ', star(3:end)])
         else
-            xticks([log(10), log(100),log(1000)])
-            xticklabels({'10', '100','1000'})  
-        end        
-    %     xticks([log(4.9), log(17.9),log(94), log(217.2)])
-    %     xticklabels({'4.9', '17.9', '94', '217.2'})
+            title([star(1:2), ' ', star(3:end)])
+        end
         set(gca,'xticklabel',[])
         yticks(order(1:10))
         set(gca,'fontsize',12)
-
+        box on
+        set(gca,'Layer','top')
+        
     ax2 = subplot(80,1,29:40);
         plot(x(x_idx), power_nor2, 'k', 'LineWidth', 1)
         xlim([min(x(x_idx)) max(x(x_idx))])
         ylim([0, power_max])
         ylabel('Power');
         if strcmp(star, 'Gl674')
-            xline(32.9,'--r');
-            xline(4.6938,'--b');
+            xline(32.9,'-.r');
+            xline(4.694,'-.b');
             T = text(32.9, power_max*0.8, 'P*', 'FontSize',12, 'HorizontalAlignment', 'right');
+            yline(FAP_val(1), '--k')  
+        elseif strcmp(star, 'Gl628')
+            xline(4.9, '-.b');
+            xline(17.9, '-.b');
+            xline(217.2, '-.b');
+            xline(94, '-.r');
+            text(94, power_max*0.8, 'P*', 'FontSize',12, 'HorizontalAlignment', 'right');
+            yline(FAP_val(1), '--k')            
+        elseif strcmp(star, 'HD103720')
+            xline(17, '-.r');
+            xline(68, '-.r');
+            xline(4.557, '-.b');
+            text(17, power_max*0.8, 'P*', 'FontSize',12, 'HorizontalAlignment', 'right');
+            text(68, power_max*0.8, '4P*', 'FontSize',12, 'HorizontalAlignment', 'right');            
+            text(4.557, power_max*0.8, 'P_{b}', 'FontSize',12, 'HorizontalAlignment', 'right');
+            yline(FAP_val(1), '--k')
+        elseif strcmp(star, 'Gl479')
+            xline(11.3, '-.b');
+            xline(23.1, '-.b');
+            xline(24.8, '-.r');
+            text(24.8+0.5, power_max*0.8, 'P*', 'FontSize',12, 'HorizontalAlignment', 'left');     
+            yline(FAP_val(1), '--k')            
+        elseif strcmp(star, 'Gl358')
+            xline(13.16, '-.b');
+            xline(26.27, '-.b');
+            xline(26.8, '-.r');
+            text(26.8+0.5, power_max*0.8, 'P*', 'FontSize',12, 'HorizontalAlignment', 'left');     
+            yline(FAP_val(1), '--k')
         end        
-    %     yticks(power_nor2)
-    %     T = text(4.9, 0.11, 'P_1', 'FontSize',12, 'HorizontalAlignment', 'center');
-    %     T = text(17.9, 0.11, 'P_2', 'FontSize',12, 'HorizontalAlignment', 'center');
-    %     T = text(217.2, 0.11, 'P_3', 'FontSize',12, 'HorizontalAlignment', 'center');
-    %     T = text(94, 0.11, 'P*', 'FontSize',12, 'HorizontalAlignment', 'center');   
-    %     ylim([0 0.1])
         set(gca, 'XScale', 'log')
         set(gca,'fontsize',12)
+        
     pos1 = get(ax2, 'Position') % gives the position of current sub-plot
     new_pos1 = pos1 +[0.00 0 -0.079 0]
     set(ax2, 'Position', new_pos1) % set new po
@@ -168,15 +191,39 @@ for vmin = [0, FAP_val(1)]
         ylim([0, power_max])
         ylabel('Power');
         if strcmp(star, 'Gl674')
-            xline(32.9,'--r');
-            xline(4.6938,'--b');
+            xline(32.9,'-.r');
+            xline(4.6938,'-.b');
             T = text(4.6938, power_max*0.8, 'P_b', 'FontSize',12, 'HorizontalAlignment', 'right');
+            yline(FAP_val(1), '--k')  
+        elseif strcmp(star, 'Gl628')
+            xline(4.9, '-.b');
+            xline(17.9, '-.b');
+            xline(217.2, '-.b');
+            xline(94, '-.r');
+            text(4.9, power_max*0.8, 'P_{b}', 'FontSize',12, 'HorizontalAlignment', 'right');
+            text(17.9, power_max*0.8, 'P_{c}', 'FontSize',12, 'HorizontalAlignment', 'right');            
+            text(217.2, power_max*0.8, 'P_{d}', 'FontSize',12, 'HorizontalAlignment', 'right');            
+            yline(FAP_val(1), '--k')                        
+        elseif strcmp(star, 'HD103720')
+            xline(17, '-.r');
+            xline(68, '-.r');
+            xline(4.557, '-.b');
+            yline(FAP_val(1), '--k')       
+        elseif strcmp(star, 'Gl479')
+            xline(11.3, '-.b');
+            xline(23.1, '-.b');
+            xline(24.8, '-.r');
+            text(11.3, power_max*0.8, 'P_{b}?', 'FontSize',12, 'HorizontalAlignment', 'right');
+            text(23.1, power_max*0.8, 'P_{c}?', 'FontSize',12, 'HorizontalAlignment', 'right');                
+            yline(FAP_val(1), '--k')             
+        elseif strcmp(star, 'Gl358')
+            xline(13.16, '-.b');
+            xline(26.27, '-.b');
+            xline(26.8, '-.r');
+            text(13.16, power_max*0.8, 'P_{b}?', 'FontSize',12, 'HorizontalAlignment', 'right');
+            text(26.27, power_max*0.8, 'P_{c}?', 'FontSize',12, 'HorizontalAlignment', 'right');          
+            yline(FAP_val(1), '--k')            
         end
-    %     T = text(4.9, 0.11, 'P_1', 'FontSize',12, 'HorizontalAlignment', 'center');
-    %     T = text(17.9, 0.11, 'P_2', 'FontSize',12, 'HorizontalAlignment', 'center');
-    %     T = text(217.2, 0.11, 'P_3', 'FontSize',12, 'HorizontalAlignment', 'center');
-    %     T = text(94, 0.11, 'P*', 'FontSize',12, 'HorizontalAlignment', 'center');   
-    %     ylim([0 0.1])
         set(gca,'xticklabel',[])
         set(gca, 'XScale', 'log')
         set(gca,'fontsize',12)
@@ -196,12 +243,13 @@ for vmin = [0, FAP_val(1)]
             h = pcolor(log(X_fft),Y_fft,   power_fre(order+1, x_idx) );
         end
         set(h, 'edgecolor', 'none');
+        colormap(flipud(gray))
         colorbar;
         caxis([vmin vmax]);
         ylabel('Odd orders');
         if strcmp(star, 'HD103720')
-            xticks([log(4.557), log(10), log(100),log(1000)])
-            xticklabels({'4.557', '10', '100','1000'})    
+            xticks([log(10), log(100),log(1000)])
+            xticklabels({'10', '100','1000'})    
         else
             xticks([log(10), log(100),log(1000)])
             xticklabels({'10', '100','1000'})  
@@ -212,6 +260,8 @@ for vmin = [0, FAP_val(1)]
         yticks(order(1:10))
         set(gca,'fontsize',12)
         set(gca, 'YDir','reverse')
+        box on
+        set(gca,'Layer','top')
 
     set(gcf, 'PaperUnits', 'centimeters');
     set(gcf, 'PaperPosition', [0 0 20 30]); %x_width=20cm y_width=30cm
