@@ -16,6 +16,7 @@ Created on Thu Jul 27 16:43:04 2017
 # Remove hdulist[0].header['HIERARCH ESO DRS BERV']. 
 # simplify n_file @08/08/17
 # Add a loop to calculate RVC and RVW @08/08/17
+# Derive FWHM, BIS, V_span @23/08/19
 
 #############################################
 
@@ -34,14 +35,14 @@ from statistics import median
 #############################################
 
 def gaussian(x, a, mu, sigma, C):
-    val = a / ( (2*math.pi)**0.5 * sigma ) * np.exp(-(x - mu)**2 / sigma**2) + C
+    val = a / ( (2*math.pi)**0.5 * sigma ) * np.exp(-(x - mu)**2 / (2 * sigma**2)) + C
     return val
 
 #############################################
 
 # STAR        = 'HD224789'
-STAR        = 'HD103720'
-# STAR        = 'HD216770'
+# STAR        = 'HD103720'
+STAR        = 'HD216770'
 # STAR        = 'BD-213153'
 # STAR        = 'HD200143'
 # STAR        = 'Gl674'
@@ -50,6 +51,8 @@ STAR        = 'HD103720'
 # STAR            = 'Gl358'
 # STAR            = 'Gl479'
 # STAR        = 'HD189733'
+# STAR        = 'HD36051'
+
 
 
 FILE0       = glob.glob('../' + STAR + '/1-download/*fits')
@@ -89,12 +92,17 @@ if 0: # to obtain the medin SNR of HD189733
 
 print('\n')    
 
-RVC = median(RV_HARPS)
-RVW = median(FWHM_HARPS) * 1.5
-x   = np.arange(RVC-RVW, RVC+RVW+0.1, 0.1)
-y   = np.zeros(len(x))
-RV_noise = np.zeros(n_file)
-V_span = np.zeros(n_file)
+RVC     = median(RV_HARPS)
+RVW     = median(FWHM_HARPS) * 1.5
+x       = np.arange(RVC-RVW, RVC+RVW+0.1, 0.1)
+y       = np.zeros(len(x))
+RV_noise= np.zeros(n_file)
+V_span  = np.zeros(n_file)
+dV_span = np.zeros(n_file)
+FWHM    = np.zeros(n_file)
+dFWHM   = np.zeros(n_file)
+BIS     = np.zeros(n_file)
+dBIS    = np.zeros(n_file)
 
 plt.figure()
 
@@ -132,7 +140,7 @@ for n in range(n_file):
         continue
 
     RV_noise[n] = hdulist[0].header['HIERARCH ESO DRS CCF NOISE'] * 1000        # RV_noise in m/s    
-    if RV_noise[n] > 5:
+    if RV_noise[n] > 3:
         print(' Achtung! ' + STAR_read + ' too noisy')
         shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')
         continue
@@ -207,7 +215,7 @@ for n in range(n_file):
             shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')    
             continue
 
-    if 1:
+    if 0:
         if (MJD[n] > 57161):
             print(' Achtung! ' +  STAR_read + ' fibre upgrade')
             shutil.move(FILE[n], '../' + STAR + '/3-ccf_fits/abandoned/')    
@@ -219,26 +227,78 @@ for n in range(n_file):
     writefile   = output_name.replace('.fits', '.dat')
     np.savetxt(writefile, y_new)
 
+    ########
+    # FWHM #
+    ######## 
+    popt, pcov  = curve_fit( gaussian, v, ccf, [-ccf.max(), RV_HARPS[n], RVW/2, ccf.max()], sigma=ccf**0.5, absolute_sigma=True)
+    FWHM[n]     = popt[2] * math.sqrt(8*math.log(2))
+    dFWHM[n]    = pcov[2,2]**0.5 * math.sqrt(8*math.log(2))
 
-    # Calculate Vspan:
-    # σ is the width of the CCF
-    # I take σ as the FWHM
+    #######
+    # BIS #
+    #######
+    ccf_nor = (ccf - popt[3]) / (popt[0] / ( (2*math.pi)**0.5 * popt[2] ))    # normalize --> Gaussian function
+    idx_l   = v < RV_HARPS[n]
+    idx_r   = v > RV_HARPS[n]
+    v_l     = v[idx_l]
+    v_r     = v[idx_r]
+    ccf_l   = ccf_nor[idx_l]
+    ccf_r   = ccf_nor[idx_r]
+    idx_ll  = (ccf_l <= 0.9) & (ccf_l >= 0.6)
+    idx_rr  = (ccf_r <= 0.9) & (ccf_r >= 0.6)
 
+    # rotate CCF for interpolation
+    xx      = np.linspace(0.6, 0.9, 101)
+    cs      = CubicSpline(ccf_r[idx_rr][::-1], v_r[idx_rr][::-1])
+    temp1   = np.mean(cs(xx))        # mean of v_r at the bottom
+    midpoint_bottom     = cs(0.75)
+    cs      = CubicSpline(ccf_l[idx_ll], v_l[idx_ll])
+    temp2   = np.mean(cs(xx))        # mean of v_l at the bottom
+    v_bottom= (temp1 + temp2)/2     # Note that the line profile is reversed
+
+
+    # plt.plot(v_r[idx_rr], ccf_r[idx_rr], '.'); plt.show()
+    # plt.plot(ccf_r[idx_rr], v_r[idx_rr], '.'); plt.show()
+
+    idx_ll  = (ccf_l <= 0.4) & (ccf_l >= 0.1)
+    idx_rr  = (ccf_r <= 0.4) & (ccf_r >= 0.1)
+    xx      = np.linspace(0.1, 0.4, 101)
+    cs      = CubicSpline(ccf_r[idx_rr][::-1], v_r[idx_rr][::-1])
+    temp1   = np.mean(cs(xx))        # mean of v_r at the bottom
+    midpoint_top    = cs(0.25)
+    cs      = CubicSpline(ccf_l[idx_ll], v_l[idx_ll])
+    temp2   = np.mean(cs(xx))        # mean of v_l at the bottom
+    v_top   = (temp1 + temp2)/2     # Note that the line profile is reversed
+
+    BIS[n]  = v_top - v_bottom
+    # This is an approximation!
+    dBIS[n] = dFWHM[n] * ( abs(midpoint_top - RV_HARPS[n])**2 + abs(midpoint_bottom - RV_HARPS[n])**2 )**0.5 / (FWHM[n]/2) 
+
+    ###################
+    # Calculate Vspan #
+    ###################
+    sigma   = FWHM_HARPS[n]/2
     # the upper part of the CCF is defined in the range [–∞:–1σ][+1σ:+∞] 
-    idx     = (v < (RV_HARPS[n] - FWHM_HARPS[n])) + (v > (RV_HARPS[n] + FWHM_HARPS[n]))
+    idx     = (v < (RV_HARPS[n] - sigma)) + (v > (RV_HARPS[n] + sigma))
     x_span  = v[idx]
-    y_span  = ccf[idx]/ccf.max()
-    popt, pcov  = curve_fit( gaussian, x_span, y_span, [-RVW/2, RV_HARPS[n], RVW/2, 1])
-    V_high = popt[1]
+    y_span  = ccf[idx]
+    popt, pcov  = curve_fit( gaussian, x_span, y_span, [-ccf.max(), RV_HARPS[n], RVW/2, ccf.max()], sigma=y_span**0.5, absolute_sigma=True)
+    V_high  = popt[1]
+    dV_high_squared     = pcov[1,1]
 
     # the lower part is defined in the range given by [–∞:-3σ][–1σ:+1σ][+3σ:+∞].
-    idx     = (v < (RV_HARPS[n] - 3*FWHM_HARPS[n])) + (v > (RV_HARPS[n] + 3*FWHM_HARPS[n])) + (v > (RV_HARPS[n] - FWHM_HARPS[n])) * (v < (RV_HARPS[n] + FWHM_HARPS[n]))
+    idx     = (v < (RV_HARPS[n] - 3*sigma)) + (v > (RV_HARPS[n] + 3*sigma)) + (v > (RV_HARPS[n] - sigma)) * (v < (RV_HARPS[n] + sigma))
     x_span  = v[idx]
-    y_span  = ccf[idx]/ccf.max()
-    popt, pcov  = curve_fit( gaussian, x_span, y_span, [-RVW/2, RV_HARPS[n], RVW/2, 1])
+    y_span  = ccf[idx]
+    popt, pcov  = curve_fit( gaussian, x_span, y_span, [-ccf.max(), RV_HARPS[n], RVW/2, ccf.max()], sigma=y_span**0.5, absolute_sigma=True)
     V_low = popt[1]
-    V_span[n] = (V_high - V_low) * 1000
+    dV_low_squared      = pcov[1,1]
 
+    V_span[n]   = (V_high - V_low) * 1000
+    dV_span[n]  = (dV_high_squared + dV_low_squared)**0.5 * 1000
+
+BIS     *= 1000
+dBIS    *= 1000
 
 
 plt.show()
@@ -250,8 +310,13 @@ np.savetxt('../' + STAR + '/MJD.dat', MJD[~idx])
 np.savetxt('../' + STAR + '/RV_HARPS.dat', RV_HARPS[~idx])
 np.savetxt('../' + STAR + '/x.dat', x)
 np.savetxt('../' + STAR + '/RV_noise.dat', RV_noise[~idx])
-np.savetxt('../' + STAR + '/FWHM.dat', FWHM_HARPS[~idx])
+np.savetxt('../' + STAR + '/FWHM_HARPS.dat', FWHM_HARPS[~idx])
 np.savetxt('../' + STAR + '/V_span.dat', V_span[~idx])
+np.savetxt('../' + STAR + '/dV_span.dat', dV_span[~idx])
+np.savetxt('../' + STAR + '/FWHM.dat', FWHM[~idx])
+np.savetxt('../' + STAR + '/dFWHM.dat', dFWHM[~idx])
+np.savetxt('../' + STAR + '/BIS.dat', BIS[~idx])
+np.savetxt('../' + STAR + '/dBIS.dat', dBIS[~idx])
 output  = np.vstack((MJD[~idx], (RV_HARPS[~idx]-np.mean(RV_HARPS[~idx]))*1000, RV_noise[~idx]))
 output = np.transpose(output)
 np.savetxt('../' + STAR + '/' + STAR + '.txt', output, fmt='%1.8f')
@@ -284,7 +349,6 @@ if 0:
     y_plot = P.polyval(MJD[~idx], c)
     plt.plot(MJD[~idx], y_plot - (RV_HARPS[~idx] *1000 - np.mean(RV_HARPS[~idx] *1000)), '.')
     plt.show()
-
 
 
 from PyAstronomy.pyTiming import pyPeriod
