@@ -52,22 +52,27 @@ def gaussian(x, a, mu, sigma, C):
 #################################
 # Results from the HARPS header #
 #################################
-data_ccf    = read_rdb('/Volumes/DataSSD/SOAP_2/outputs/02.01/phase_rv.dat')
+# data_ccf    = read_rdb('/Volumes/DataSSD/SOAP_2/outputs/02.01/phase_rv.dat')
+data_ccf    = read_rdb('/Volumes/DataSSD/SOAP_2/outputs/02.01-plage/phase_rv.dat')
 RV_HARPS 	= np.array(data_ccf['RV_tot']) * 1000   	# m/s
 FWHM_HARPS 	= np.array(data_ccf['Fwhm_tot'])   			# km/s
 BIS_HARPS 	= np.array(data_ccf['Bis_Span_tot'])*1000   # m/s
 BIS_HARPS 	= BIS_HARPS - np.mean(BIS_HARPS)
 
-#############################################
-# Define variables 
-# NOISE 	= 5000
+####################
+# Define variables #
+####################
+# NOISE 	= 10000
 # NOISE 	= 2000
-NOISE 	= False
+# NOISE 	= False
+PLAGE = True
 
-if NOISE:
-	N = 10000			# number of files 
-else:
-	N = 100
+#############################################
+# if NOISE:
+# 	N = 10000			# number of files 
+# else:
+# 	N = 100
+N = 100
 RV 		= np.zeros(N)
 FWHM	= np.zeros(N)
 V_span	= np.zeros(N)
@@ -79,10 +84,12 @@ idx0 	= (v_CCF >= -10) & (v_CCF <= 10)
 v_ccf  	= v_CCF[idx0]
 
 for i in range(N):
-	if NOISE:
-		filename	= '/Volumes/DataSSD/SOAP_2/outputs/02.01/CCF_dat_SN=' + str(NOISE) + '/CCF' + str(i) + '.dat'
+	if PLAGE: 
+		filename	= '/Volumes/DataSSD/SOAP_2/outputs/02.01-plage/CCF_dat/CCF' + str(i) + '.dat'
+	elif NOISE:
+		filename	= '/Volumes/DataSSD/SOAP_2/outputs/02.01-plage/CCF_dat_SN=' + str(NOISE) + '/CCF' + str(i) + '.dat'
 	else:
-		filename 	= '/Volumes/DataSSD/SOAP_2/outputs/02.01/CCF_dat/CCF' + str(i) + '.dat'
+		filename 	= '/Volumes/DataSSD/SOAP_2/outputs/02.01-plage/CCF_dat/CCF' + str(i) + '.dat'
 	CCF 		= 1 - np.loadtxt(filename)
 	ccf 		= CCF[idx0]
 	# popt, pcov  = curve_fit(gaussian, v_ccf, ccf)
@@ -90,7 +97,8 @@ for i in range(N):
 	popt0 		= popt 								# Keep a snapshot
 	RV[i]   	= popt[1]    						# km/s
 	FWHM[i]		= popt[2] * math.sqrt(8*math.log(2))
-	sigma 		= FWHM[i]/2
+	sigma 		= FWHM[i]/2 						# performs better than sigma = popt[2]
+	# sigma 		= popt[2]
 
 	###################
 	# Calculate Vspan #
@@ -98,18 +106,25 @@ for i in range(N):
 	# σ is the width of the CCF
 	# I take σ as the FWHM
 
+	# oversample v_CCF
+	from scipy.interpolate import interp1d
+	f 		= interp1d(v_CCF, CCF, kind='cubic')
+	v_CCFi 	= np.linspace(-10, 10, 2000)
+	CCFi 	= f(v_CCFi)
+
 	# the upper part of the CCF is defined in the range [–∞:–1σ][+1σ:+∞] 
-	idx     = (v_CCF < (RV[i] - sigma)) + (v_CCF > (RV[i] + sigma))
-	x_span  = v_CCF[idx]
-	y_span  = CCF[idx]/CCF.max()
+	idx     = (v_CCFi < (RV[i] - sigma)) + (v_CCFi > (RV[i] + sigma))
+	x_span  = v_CCFi[idx]
+	y_span  = CCFi[idx]/CCFi.max()
 	popt, pcov  = curve_fit(gaussian, x_span, y_span, popt0)
 	V_high = popt[1]
 
 	# the lower part is defined in the range given by [–∞:-3σ][–1σ:+1σ][+3σ:+∞].
-	idx     = (v_CCF < (RV[i] - 3*sigma)) + (v_CCF > (RV[i] + 3*sigma)) + (v_CCF > (RV[i] - sigma)) * (v_CCF < (RV[i] + sigma))
-	x_span  = v_CCF[idx]
-	y_span  = CCF[idx]/CCF.max()
+	idx     = (v_CCFi < (RV[i] - 3*sigma)) + (v_CCFi > (RV[i] + 3*sigma)) + (v_CCFi > (RV[i] - sigma)) * (v_CCFi < (RV[i] + sigma))
+	x_span  = v_CCFi[idx]
+	y_span  = CCFi[idx]/CCFi.max()
 	popt, pcov  = curve_fit( gaussian, x_span, y_span, popt0)
+	plt.plot(x_span, y_span, '.')
 	V_low = popt[1]
 	V_span[i] = (V_high - V_low) * 1000		# in unit of m/s
 
@@ -149,14 +164,18 @@ for i in range(N):
 	BIS[i] 	= v_top - v_bottom
 
 BIS = (BIS - np.mean(BIS))*1000	# m/s
-
+plt.show()
 
 #####################
 # Correlation plots #
 #####################
 RV 		= (RV - np.mean(RV))*1000
 V_span 	= V_span - np.mean(V_span)
-if NOISE:
+if PLAGE:
+	DIR 		= '/Volumes/DataSSD/MATLAB_codes/Project180316-shfit_in_FT/plage/'
+	SAVE_NAME 	= DIR + 'plage.png'
+	alpha = 0.5
+elif NOISE:
 	DIR 		= '/Volumes/DataSSD/MATLAB_codes/Project180316-shfit_in_FT/jitter_SN=' + str(NOISE) +'/'
 	SAVE_NAME 	= DIR + 'correlation_SN' + str(NOISE) + '.png'
 	alpha = 0.01
@@ -167,14 +186,16 @@ else:
 dRV_L 	= np.loadtxt(DIR + 'YY.txt')
 dRV_H 	= np.loadtxt(DIR + 'ZZ.txt')
 
-left  = 0.08  # the left side of the subplots of the figure
-right = 0.95    # the right side of the subplots of the figure
-bottom = 0.2   # the bottom of the subplots of the figure
-top = 0.8      # the top of the subplots of the figure
-wspace = 0.6   # the amount of width reserved for blank space between subplots
-hspace = 0.2   # the amount of height reserved for white space between subplots
-Nx = 3
-Ny = 3
+left  	= 0.08  # the left side of the subplots of the figure
+right 	= 0.95    # the right side of the subplots of the figure
+bottom 	= 0.2   # the bottom of the subplots of the figure
+top 	= 0.8      # the top of the subplots of the figure
+wspace 	= 0.6   # the amount of width reserved for blank space between subplots
+hspace 	= 0.2   # the amount of height reserved for white space between subplots
+fontsize=18
+w 		= np.ones(N)
+Nx 		= 3
+Ny 		= 3
 
 plt.rcParams.update({'font.size': 20})
 fig, axes = plt.subplots(figsize=(20, 4))
@@ -185,7 +206,8 @@ plt.plot(RV, FWHM, 'ko', alpha=alpha)
 plt.xlabel('Jitter [m/s]')
 plt.ylabel('FWHM [km/s]')
 r1, p = stats.pearsonr(RV, FWHM)
-plt.title(r'$\rho = {0:.2f}$'.format(r1))
+# delta_r = (1-r1**2)/(N-2)**0.5
+plt.title(r'$\rho = {0:.2f}$'.format(r1), fontsize=fontsize)
 axes_1.xaxis.set_major_locator(plt.MaxNLocator(Nx))
 axes_1.yaxis.set_major_locator(plt.MaxNLocator(Ny))
 
@@ -194,7 +216,7 @@ plt.plot(RV, BIS, 'ko', alpha=alpha)
 plt.xlabel('Jitter [m/s]')
 plt.ylabel('BIS [m/s]')
 r1, p = stats.pearsonr(RV, BIS)
-plt.title(r'$\rho = {0:.2f}$'.format(r1))
+plt.title(r'$\rho = {0:.2f}$'.format(r1), fontsize=fontsize)
 axes_2.xaxis.set_major_locator(plt.MaxNLocator(Nx))
 axes_2.yaxis.set_major_locator(plt.MaxNLocator(Ny))
 
@@ -203,7 +225,7 @@ plt.plot(RV, V_span, 'ko', alpha=alpha)
 plt.xlabel('Jitter [m/s]')
 plt.ylabel(r'$V_{span}$ [m/s]')
 r1, p = stats.pearsonr(RV, V_span)
-plt.title(r'$\rho = {0:.2f}$'.format(r1))
+plt.title(r'$\rho = {0:.2f}$'.format(r1), fontsize=fontsize)
 axes_3.xaxis.set_major_locator(plt.MaxNLocator(Nx))
 axes_3.yaxis.set_major_locator(plt.MaxNLocator(Ny))
 
@@ -212,7 +234,8 @@ plt.plot(RV, dRV_L, 'ko', alpha=alpha)
 plt.xlabel('Jitter [m/s]')
 plt.ylabel(r'$\Delta RV_L$ [m/s]')
 r1, p = stats.pearsonr(RV, dRV_L)
-plt.title(r'$\rho = {0:.2f}$'.format(r1))
+fit, V 	= np.polyfit(RV, dRV_L, 1, w=w)
+plt.title(r'$\rho = {0:.2f}; k={1:.2f}$'.format(r1,fit), fontsize=fontsize)
 axes_4.xaxis.set_major_locator(plt.MaxNLocator(Nx))
 axes_4.yaxis.set_major_locator(plt.MaxNLocator(Ny))
 
@@ -221,7 +244,8 @@ plt.plot(RV, dRV_H, 'ko', alpha=alpha)
 plt.xlabel('Jitter [m/s]')
 plt.ylabel(r'$\Delta RV_H$ [m/s]')
 r1, p = stats.pearsonr(RV, dRV_H)
-plt.title(r'$\rho = {0:.2f}$'.format(r1))
+fit, V 	= np.polyfit(RV, dRV_H, 1, w=w)
+plt.title(r'$\rho = {0:.2f}; k={1:.2f}$'.format(r1,fit), fontsize=fontsize)
 axes_5.xaxis.set_major_locator(plt.MaxNLocator(Nx))
 axes_5.yaxis.set_major_locator(plt.MaxNLocator(Ny))
 
@@ -269,7 +293,7 @@ if 0:
 	plt.plot(v_CCF, CCF); plt.show()
 	# best fits 
 	plt.plot(v_ccf, ccf) 
-	# plt.plot(v_ccf, gaussian(v_ccf, *popt))
+	plt.plot(v_ccf, gaussian(v_ccf, *popt))
 	plt.show()
 
 	# RV, FWHM
@@ -282,4 +306,47 @@ if 0:
 	plt.plot(x_span, y_span, '.') 
 	plt.show()
 
+#############################
+# Plot the improved version #
+#############################
+
+left  	= 0.15  # the left side of the subplots of the figure
+right 	= 0.95    # the right side of the subplots of the figure
+bottom 	= 0.2   # the bottom of the subplots of the figure
+top 	= 0.8      # the top of the subplots of the figure
+wspace 	= 0.6   # the amount of width reserved for blank space between subplots
+hspace 	= 0.2   # the amount of height reserved for white space between subplots
+Nx 		= 3
+Ny 		= 3
+fontsize= 18
+
+plt.rcParams.update({'font.size': 20})
+fig, axes = plt.subplots(figsize=(8, 4))
+plt.subplots_adjust(left=left, bottom=bottom, right=right, top=top, wspace=wspace, hspace=hspace)
+fig.suptitle('Simulation', y=0.95)
+
+axes_4 = plt.subplot(121)
+plt.plot(RV, dRV_L, 'ko', alpha=alpha)
+plt.xlabel('Jitter [m/s]')
+plt.ylabel(r'$\Delta RV_L$ [m/s]')
+r1, p = stats.pearsonr(RV, dRV_L)
+delta_r = (1-r1**2)/(N-2)**0.5
+fit, V 	= np.polyfit(RV, dRV_L, 1, w=w)
+plt.title(r'$\rho$={0:.2f}±{1:.2f}'.format(r1,delta_r), fontsize=fontsize)
+axes_4.xaxis.set_major_locator(plt.MaxNLocator(Nx))
+axes_4.yaxis.set_major_locator(plt.MaxNLocator(Ny))
+
+axes_4 = plt.subplot(122)
+plt.plot(RV, dRV_H, 'ko', alpha=alpha)
+plt.xlabel('Jitter [m/s]')
+plt.ylabel(r'$\Delta RV_H$ [m/s]')
+r1, p = stats.pearsonr(RV, dRV_H)
+delta_r = (1-r1**2)/(N-2)**0.5
+fit, V 	= np.polyfit(RV, dRV_H, 1, w=w)
+plt.title(r'$\rho$={0:.2f}±{1:.2f}'.format(r1,delta_r), fontsize=fontsize)
+axes_5.xaxis.set_major_locator(plt.MaxNLocator(Nx))
+axes_5.yaxis.set_major_locator(plt.MaxNLocator(Ny))
+
+plt.savefig(SAVE_NAME[:-4] + '_half_frequency.png')
+plt.show()
 
